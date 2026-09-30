@@ -11,7 +11,7 @@ public record SignupRequest(
         // @Pattern은 허용할 문자 규칙입니다. \p{L}은 한글·영문 등 유니코드 문자입니다.
         // 일반 띄어쓰기만 함께 허용하고 숫자, 기호, 이모지, 탭과 줄바꿈은 거절합니다.
         @NotBlank @Size(min = 1, max = 30)
-        @Pattern(regexp = "[\\p{L} ]+", message = "이름은 문자와 공백만 사용할 수 있습니다.") String name,
+        @Pattern(regexp = "[\\p{L} ]+", message = "이름은 문자만 사용할 수 있습니다.") String name,
         // @Email은 이메일 형식을 검사합니다. 필수 여부는 @NotBlank가 따로 검사합니다.
         @NotBlank @Email @Size(max = 254) String email,
         // 문자 길이는 8~32자이고, 아래 별도 검증에서 UTF-8 72바이트 제한도 확인합니다.
