@@ -17,7 +17,9 @@ import org.springframework.test.web.servlet.ResultActions;
 import java.time.Duration;
 import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:login;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;INIT=CREATE DOMAIN IF NOT EXISTS TIMESTAMPTZ AS TIMESTAMP WITH TIME ZONE")
@@ -121,6 +123,33 @@ class LoginIntegrationTests {
     }
 
     @Test
+    void deletingUserInDatabaseCascadesToRefreshTokens() throws Exception {
+        login(BODY).andExpect(status().isOk());
+        login(BODY).andExpect(status().isOk());
+        assertThat(refreshTokens.count()).isEqualTo(2);
+        // JPA로 토큰을 먼저 지우지 않습니다. DB의 FK가 실제로 연쇄 삭제하는지 검증합니다.
+        jdbc.update("DELETE FROM users WHERE id = ?", user.getId());
+        assertThat(refreshTokens.count()).isZero();
+    }
+
+    @Test
+    void deletingRefreshTokenDoesNotDeleteUser() throws Exception {
+        login(BODY).andExpect(status().isOk());
+        refreshTokens.deleteAll();
+        assertThat(users.existsById(user.getId())).isTrue();
+    }
+
+    @Test
+    void databaseEnforcesExactly64CharactersForTokenHash() throws Exception {
+        login(BODY).andExpect(status().isOk());
+        for (int length : new int[]{63, 65}) {
+            assertThatThrownBy(() -> jdbc.update("UPDATE refresh_tokens SET token_hash = ?", "a".repeat(length)))
+                    .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        }
+        assertThat(refreshTokens.findAll().getFirst().getTokenHash()).hasSize(64);
+    }
+
+    @Test
     void storageFailureDoesNotIssueTokensOrCookie() throws Exception {
         jdbc.execute("ALTER TABLE refresh_tokens ADD CONSTRAINT test_reject_refresh CHECK (token_hash = 'forbidden')");
         try {
@@ -142,7 +171,7 @@ class LoginIntegrationTests {
     }
 
     private ResultActions login(String body) throws Exception {
-        return mvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content(body)
+        return mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON).content(body)
                 .with(request -> { request.setRemoteAddr(clientIp); return request; }));
     }
 }

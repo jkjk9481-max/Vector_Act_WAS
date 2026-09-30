@@ -2,8 +2,8 @@
 -- 기존 users 테이블 생성 후 실행합니다. 이 파일은 애플리케이션이 자동 실행하지 않습니다.
 CREATE TABLE refresh_tokens (
     id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id),
-    token_hash VARCHAR(64) NOT NULL UNIQUE,
+    user_id UUID NOT NULL CONSTRAINT fk_refresh_tokens_user REFERENCES users(id) ON DELETE CASCADE,
+    token_hash VARCHAR(64) NOT NULL UNIQUE CONSTRAINT ck_refresh_token_hash_length CHECK (char_length(token_hash) = 64),
     family_id UUID NOT NULL,
     issued_at TIMESTAMPTZ NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,

@@ -9,9 +9,9 @@ import java.util.Locale;
 public record SignupRequest(
         // @NotBlank는 null, 빈 문자열, 공백뿐인 입력을 거절하고 @Size는 문자열 길이를 검사합니다.
         // @Pattern은 허용할 문자 규칙입니다. \p{L}은 한글·영문 등 유니코드 문자입니다.
-        // 일반 띄어쓰기만 함께 허용하고 숫자, 기호, 이모지, 탭과 줄바꿈은 거절합니다.
+        // 문자만 허용합니다. 숫자, 기호, 이모지와 앞뒤·중간의 모든 공백을 거절합니다.
         @NotBlank @Size(min = 1, max = 30)
-        @Pattern(regexp = "[\\p{L} ]+", message = "이름은 문자만 사용할 수 있습니다.") String name,
+        @Pattern(regexp = "\\p{L}+", message = "이름은 공백 없이 문자만 사용할 수 있습니다.") String name,
         // @Email은 이메일 형식을 검사합니다. 필수 여부는 @NotBlank가 따로 검사합니다.
         @NotBlank @Email @Size(max = 254) String email,
         // 문자 길이는 8~32자이고, 아래 별도 검증에서 UTF-8 72바이트 제한도 확인합니다.
@@ -25,9 +25,9 @@ public record SignupRequest(
 ) {
     public SignupRequest {
         // record의 간결한 생성자입니다. JSON에서 읽은 값이 필드에 들어가기 전에 정리합니다.
-        // 생성할 때 정리하므로 이름 길이 검사와 이메일 중복 검사는 정규화된 값으로 진행됩니다.
+        // 이름은 strip()하지 않습니다. 공백이 있는 입력을 몰래 고치지 않고 검증 오류로 알려줍니다.
+        // 이메일만 기존 정책대로 정규화합니다.
         // 조건 ? 참일 때 값 : 거짓일 때 값. null에 strip()을 호출하면 오류가 나므로 먼저 확인합니다.
-        name = name == null ? null : name.strip();
         email = email == null ? null : email.strip().toLowerCase(Locale.ROOT);
         // 비밀번호의 공백은 실제 비밀번호의 일부이므로 제거하지 않습니다.
     }

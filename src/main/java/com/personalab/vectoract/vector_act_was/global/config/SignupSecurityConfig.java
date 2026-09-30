@@ -5,21 +5,35 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfException;
+import com.personalab.vectoract.vector_act_was.global.common.response.ErrorResponse;
+import com.personalab.vectoract.vector_act_was.global.error.ErrorCode;
+import tools.jackson.databind.ObjectMapper;
 
 // Spring 설정 클래스입니다. @Bean 메서드의 결과를 Spring이 관리하는 객체로 등록합니다.
 @Configuration
 public class SignupSecurityConfig {
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
         // SecurityFilterChain은 Controller에 도달하기 전에 요청의 보안 조건을 검사합니다.
         // CSRF는 다른 사이트에서 사용자 몰래 보내는 요청을 막는 검사입니다.
-        // 회원가입과 로그인은 인증 전에 호출합니다. CSRF 예외도 두 POST 경로에만 적용합니다.
-        http.csrf(csrf -> csrf.ignoringRequestMatchers(
-                        PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/auth/signup"),
-                        PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.POST, "/api/auth/login")))
+        // A01에서 발급한 CSRF 토큰을 세션에 보관합니다. POST 요청은 같은 세션과 토큰이 필요합니다.
+        // permitAll은 로그인 전 접근을 허용한다는 뜻이며 CSRF 검증을 생략한다는 뜻은 아닙니다.
+        http.csrf(csrf -> csrf.csrfTokenRepository(new HttpSessionCsrfTokenRepository()))
+                // CSRF 실패는 Controller 전에 발생하므로 공통 예외 처리기가 아닌 필터에서 JSON을 만듭니다.
+                .exceptionHandling(errors -> errors.accessDeniedHandler((request, response, exception) -> {
+                    response.setStatus(403);
+                    response.setContentType("application/json");
+                    response.setCharacterEncoding("UTF-8");
+                    var body = exception instanceof CsrfException
+                            ? ErrorResponse.of(ErrorCode.ACCESS_DENIED, "CSRF 토큰이 없거나 유효하지 않습니다.")
+                            : ErrorResponse.of(ErrorCode.ACCESS_DENIED);
+                    objectMapper.writeValue(response.getOutputStream(), body);
+                }))
                 // ->는 람다 문법입니다. 전달받은 설정 객체(auth)에 적용할 규칙을 적습니다.
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login").permitAll()
                         .anyRequest().authenticated()); // 나머지 요청은 인증된 사용자만 허용합니다.
         // 위 규칙을 적용한 필터 체인을 완성해 반환합니다.

@@ -68,7 +68,8 @@ public class SignupService {
 
         // 3. encode()로 비밀번호를 BCrypt 해시로 바꾼 뒤 기존 생성 메서드에 전달합니다.
         // User.create()는 Java 객체만 만듭니다. DB 저장은 다음 Repository 호출에서 진행됩니다.
-        User user = User.create(normalizedEmail, passwordEncoder.encode(password), name.strip());
+        // 이름은 DTO에서 공백 없는 문자만 허용했으므로 입력값 그대로 저장합니다.
+        User user = User.create(normalizedEmail, passwordEncoder.encode(password), name);
         // try 안의 저장 작업에서 지정한 예외가 발생하면 catch 블록으로 이동합니다.
         try {
             // flush는 SQL을 지금 실행하는 것이며 커밋은 아닙니다. 이후 동의 저장 실패 시 함께 롤백됩니다.

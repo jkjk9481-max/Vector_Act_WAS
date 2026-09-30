@@ -20,6 +20,15 @@ signup:
   terms-version: ${SIGNUP_TERMS_VERSION:}
   privacy-version: ${SIGNUP_PRIVACY_VERSION:}
 
+# CSRF의 세션 쿠키입니다. 인증 토큰 저장용 세션이 아니라 CSRF 검증값을 연결하는 용도입니다.
+server:
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: ${CSRF_SESSION_COOKIE_SECURE:true}
+        same-site: lax
+
 auth:
   jwt:
     # 최소 32바이트의 무작위 키를 Base64로 인코딩해 환경변수로 전달합니다. 기본 비밀키는 없습니다.
