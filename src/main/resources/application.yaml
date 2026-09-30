@@ -1,3 +1,21 @@
 spring:
   application:
     name: Vector_Act_WAS
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/vector_act}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+# 배포할 문서의 실제 버전을 환경변수로 지정하세요. 미설정 시 가입은 버전 오류로 거절됩니다.
+signup:
+  terms-version: ${SIGNUP_TERMS_VERSION:}
+  privacy-version: ${SIGNUP_PRIVACY_VERSION:}

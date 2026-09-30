@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:signup;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;INIT=CREATE DOMAIN IF NOT EXISTS TIMESTAMPTZ AS TIMESTAMP WITH TIME ZONE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+signup:
+  terms-version: test-v1
+  privacy-version: test-v1

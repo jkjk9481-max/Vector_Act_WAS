@@ -25,6 +25,12 @@ import java.util.List;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /** JSON 문법 오류나 본문 누락도 명세의 입력 검증 오류로 반환합니다. */
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    protected ResponseEntity<ErrorResponse> handleUnreadableBody(Exception e) {
+        return ResponseEntity.badRequest().body(ErrorResponse.of(ErrorCode.VALIDATION_ERROR));
+    }
+
     /**
      * Bean Validation 실패 (@Valid, @Validated)
      */
@@ -32,19 +38,20 @@ public class GlobalExceptionHandler {
     protected ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(
             MethodArgumentNotValidException e) {
 
-        log.warn("Validation failed: {}", e.getMessage());
+        log.warn("Validation failed: {} field errors", e.getBindingResult().getFieldErrorCount());
 
         List<ErrorResponse.FieldError> fieldErrors = e.getBindingResult()
                 .getFieldErrors()
                 .stream()
                 .map(error -> new ErrorResponse.FieldError(
                         error.getField(),
-                        error.getRejectedValue() == null ? "" : error.getRejectedValue().toString(),
+                        "password".equals(error.getField()) ? "[REDACTED]" :
+                                error.getRejectedValue() == null ? "" : error.getRejectedValue().toString(),
                         error.getDefaultMessage()
                 ))
                 .toList();
 
-        ErrorResponse response = ErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE, fieldErrors);
+        ErrorResponse response = ErrorResponse.of(ErrorCode.VALIDATION_ERROR, fieldErrors);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
@@ -57,7 +64,7 @@ public class GlobalExceptionHandler {
 
         log.warn("Type mismatch: parameter '{}', value '{}'", e.getName(), e.getValue());
 
-        ErrorResponse response = ErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE);
+        ErrorResponse response = ErrorResponse.of(ErrorCode.VALIDATION_ERROR);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
@@ -71,7 +78,7 @@ public class GlobalExceptionHandler {
         log.warn("Missing parameter: {}", e.getParameterName());
 
         ErrorResponse response = ErrorResponse.of(
-                ErrorCode.INVALID_INPUT_VALUE,
+                ErrorCode.VALIDATION_ERROR,
                 "필수 파라미터 '" + e.getParameterName() + "'이(가) 누락되었습니다."
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
