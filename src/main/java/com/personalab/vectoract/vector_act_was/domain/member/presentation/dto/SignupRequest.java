@@ -8,10 +8,14 @@ import java.util.Locale;
 /** JSON 요청을 담고, DB에 저장하기 전에 입력 조건을 검사합니다. */
 public record SignupRequest(
         // @NotBlank는 null, 빈 문자열, 공백뿐인 입력을 거절하고 @Size는 문자열 길이를 검사합니다.
-        @NotBlank @Size(min = 1, max = 30) String name,
+        // @Pattern은 허용할 문자 규칙입니다. \p{L}은 한글·영문 등 유니코드 문자입니다.
+        // 일반 띄어쓰기만 함께 허용하고 숫자, 기호, 이모지, 탭과 줄바꿈은 거절합니다.
+        @NotBlank @Size(min = 1, max = 30)
+        @Pattern(regexp = "[\\p{L} ]+", message = "이름은 문자와 공백만 사용할 수 있습니다.") String name,
         // @Email은 이메일 형식을 검사합니다. 필수 여부는 @NotBlank가 따로 검사합니다.
         @NotBlank @Email @Size(max = 254) String email,
-        @NotNull @Size(min = 12, max = 64) String password,
+        // 문자 길이는 8~32자이고, 아래 별도 검증에서 UTF-8 72바이트 제한도 확인합니다.
+        @NotNull @Size(min = 8, max = 32, message = "비밀번호는 8~32자여야 합니다.") String password,
         @NotBlank @Size(min = 1, max = 32) String termsVersion,
         @NotBlank @Size(min = 1, max = 32) String privacyVersion,
         // Boolean은 null도 담을 수 있어 누락과 false를 구분할 수 있습니다.

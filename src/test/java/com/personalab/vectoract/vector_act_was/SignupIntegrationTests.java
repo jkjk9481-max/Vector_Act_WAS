@@ -81,8 +81,8 @@ class SignupIntegrationTests {
                 REQUEST.replace("  배우  ", "a".repeat(31)),
                 REQUEST.replace("  ACTOR@example.com  ", "invalid"),
                 REQUEST.replace("  ACTOR@example.com  ", "a".repeat(243) + "@example.com"),
-                REQUEST.replace("password12345", "a".repeat(11)),
-                REQUEST.replace("password12345", "a".repeat(65)),
+                REQUEST.replace("password12345", "a".repeat(7)),
+                REQUEST.replace("password12345", "a".repeat(33)),
                 REQUEST.replace("password12345", "가".repeat(25)),
                 REQUEST.replace("test-v1", "a".repeat(33)), REQUEST.replace("test-v1", ""),
                 REQUEST.replace("true", "false"), REQUEST.replace("true", "null"), "{", ""}) {
@@ -92,11 +92,30 @@ class SignupIntegrationTests {
 
     @Test
     void acceptsPasswordBoundaries() throws Exception {
-        for (String password : new String[]{"a".repeat(12), "a".repeat(64), "가".repeat(24)}) {
+        for (String password : new String[]{"a".repeat(8), "a".repeat(32), "가".repeat(24)}) {
             clean();
             mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)
                             .content(REQUEST.replace("password12345", password)))
                     .andExpect(status().isCreated());
+        }
+    }
+
+    @Test
+    void rejectsNumbersAndSpecialCharactersInName() throws Exception {
+        // JSON에 이스케이프한 탭과 줄바꿈도 보내 실제 이름 검증에서 거절되는지 확인합니다.
+        for (String name : new String[]{"배우1", "배우１２", "배우@", "김_배우", "김-배우",
+                "O'Neil", "배우😀", "김\\t배우", "김\\n배우"}) {
+            assertInvalid(REQUEST.replace("  배우  ", name));
+        }
+    }
+
+    @Test
+    void acceptsLettersAndSpacesInName() throws Exception {
+        for (String name : new String[]{"김배우", "김 배우", "John Smith", "Élodie", "김", "가".repeat(30)}) {
+            clean();
+            mvc.perform(post("/api/auth/signup").contentType(MediaType.APPLICATION_JSON)
+                            .content(REQUEST.replace("  배우  ", "  " + name + "  ")))
+                    .andExpect(status().isCreated()).andExpect(jsonPath("$.data.name").value(name));
         }
     }
 

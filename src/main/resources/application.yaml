@@ -19,3 +19,15 @@ spring:
 signup:
   terms-version: ${SIGNUP_TERMS_VERSION:}
   privacy-version: ${SIGNUP_PRIVACY_VERSION:}
+
+auth:
+  jwt:
+    # 최소 32바이트의 무작위 키를 Base64로 인코딩해 환경변수로 전달합니다. 기본 비밀키는 없습니다.
+    secret-base64: ${JWT_SECRET_BASE64}
+    issuer: ${JWT_ISSUER:vector-act}
+  refresh-cookie:
+    # 운영은 HTTPS와 Secure=true를 사용합니다. 로컬 HTTP 개발에서만 false로 변경하세요.
+    secure: ${REFRESH_COOKIE_SECURE:true}
+  login-rate-limit:
+    max-attempts: ${LOGIN_RATE_LIMIT_MAX_ATTEMPTS:10}
+    window-seconds: ${LOGIN_RATE_LIMIT_WINDOW_SECONDS:60}

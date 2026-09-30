@@ -16,6 +16,9 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum ErrorCode {
 
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
+    RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "로그인 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
+
     // ========== Common (공통) ==========
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "입력값이 올바르지 않습니다."),
     TERMS_VERSION_INVALID(HttpStatus.BAD_REQUEST, "약관 또는 개인정보처리방침 버전이 유효하지 않습니다."),

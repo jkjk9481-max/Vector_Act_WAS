@@ -11,3 +11,14 @@ spring:
 signup:
   terms-version: test-v1
   privacy-version: test-v1
+
+auth:
+  jwt:
+    # 테스트 실행 시 Spring이 난수를 만듭니다. 운영 키나 고정된 비밀키를 저장하지 않습니다.
+    secret-base64: ${random.value}${random.value}
+    issuer: vector-act-test
+  refresh-cookie:
+    secure: true
+  login-rate-limit:
+    max-attempts: 10
+    window-seconds: 60
