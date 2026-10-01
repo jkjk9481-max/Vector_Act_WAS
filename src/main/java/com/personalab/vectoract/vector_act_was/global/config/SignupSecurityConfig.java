@@ -34,7 +34,7 @@ public class SignupSecurityConfig {
                 // ->는 람다 문법입니다. 전달받은 설정 객체(auth)에 적용할 규칙을 적습니다.
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login", "/api/auth/refresh").permitAll()
                         .anyRequest().authenticated()); // 나머지 요청은 인증된 사용자만 허용합니다.
         // 위 규칙을 적용한 필터 체인을 완성해 반환합니다.
         return http.build();

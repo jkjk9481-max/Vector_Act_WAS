@@ -30,6 +30,9 @@ public enum ErrorCode {
 
     // ========== Auth (인증/인가) ==========
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
+    REFRESH_INVALID(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다."),
+    REFRESH_EXPIRED(HttpStatus.UNAUTHORIZED, "만료된 Refresh Token입니다."),
+    REFRESH_REUSED(HttpStatus.UNAUTHORIZED, "이미 사용된 Refresh Token입니다."),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "유효하지 않은 토큰입니다."),
     EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "만료된 토큰입니다."),
 

@@ -1,6 +1,7 @@
 package com.personalab.vectoract.vector_act_was.domain.member.presentation;
 
 import com.personalab.vectoract.vector_act_was.domain.member.business.LoginService;
+import com.personalab.vectoract.vector_act_was.domain.member.business.RefreshService;
 import com.personalab.vectoract.vector_act_was.domain.member.presentation.dto.*;
 import com.personalab.vectoract.vector_act_was.global.auth.AccessTokenProvider;
 import com.personalab.vectoract.vector_act_was.global.common.response.*;
@@ -17,16 +18,29 @@ import java.time.Duration;
 @RequestMapping("/api/auth")
 public class LoginController {
     private final LoginService loginService;
+    private final RefreshService refreshService;
     private final boolean secureCookie;
 
-    public LoginController(LoginService loginService, @Value("${auth.refresh-cookie.secure:true}") boolean secureCookie) {
+    public LoginController(LoginService loginService, RefreshService refreshService,
+                           @Value("${auth.refresh-cookie.secure:true}") boolean secureCookie) {
         this.loginService = loginService;
+        this.refreshService = refreshService;
         this.secureCookie = secureCookie;
     }
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
         var result = loginService.login(request.email(), request.password());
+        return tokenResponse(result);
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<LoginResponse>> refresh(
+            @CookieValue(name = "refreshToken", required = false) String refreshToken) {
+        return tokenResponse(refreshService.refresh(refreshToken));
+    }
+
+    private ResponseEntity<ApiResponse<LoginResponse>> tokenResponse(LoginService.Result result) {
         // HttpOnly는 JavaScript에서 쿠키를 읽지 못하게 합니다. Secure는 HTTPS에서만 전송하게 합니다.
         var cookie = ResponseCookie.from("refreshToken", result.refreshToken()).httpOnly(true)
                 .secure(secureCookie).sameSite("Lax").path("/api/auth").maxAge(Duration.ofDays(14)).build();

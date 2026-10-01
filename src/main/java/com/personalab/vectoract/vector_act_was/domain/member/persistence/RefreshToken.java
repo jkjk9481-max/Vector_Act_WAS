@@ -57,4 +57,22 @@ public class RefreshToken {
         token.expiresAt = issuedAt.plusDays(14);
         return token;
     }
+
+    public RefreshToken successor(String tokenHash, OffsetDateTime issuedAt) {
+        RefreshToken token = create(user, tokenHash, issuedAt);
+        token.familyId = familyId;
+        return token;
+    }
+
+    public void rotateTo(RefreshToken replacement, OffsetDateTime now) {
+        if (revokedAt != null || replacement.id == null || !familyId.equals(replacement.familyId)) {
+            throw new IllegalStateException("Invalid refresh token rotation");
+        }
+        revoke(now);
+        replacedByTokenId = replacement.id;
+    }
+
+    public void revoke(OffsetDateTime now) {
+        if (revokedAt == null) revokedAt = now;
+    }
 }
