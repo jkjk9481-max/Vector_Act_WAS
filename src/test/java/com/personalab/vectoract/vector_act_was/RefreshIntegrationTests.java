@@ -125,9 +125,9 @@ class RefreshIntegrationTests {
     }
 
     @Test
-    void rejectsWithdrawnUserWithExistingLoginError() throws Exception {
+    void rejectsWithdrawnUserWithRefreshInvalid() throws Exception {
         jdbc.update("UPDATE users SET account_status = 'WITHDRAWN' WHERE id = ?", user.getId());
-        assertError(raw, "INVALID_CREDENTIALS");
+        assertError(raw, "REFRESH_INVALID");
         assertUnchanged();
     }
 

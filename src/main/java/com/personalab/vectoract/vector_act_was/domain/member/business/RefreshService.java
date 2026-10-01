@@ -40,7 +40,7 @@ public class RefreshService {
             throw new ReusedTokenException();
         }
         if (user.getAccountStatus() != User.AccountStatus.ACTIVE) {
-            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
+            throw new BusinessException(ErrorCode.REFRESH_INVALID);
         }
         String replacementRaw = generator.generate();
         RefreshToken replacement = tokens.saveAndFlush(token.successor(generator.hash(replacementRaw), now));

@@ -7,8 +7,8 @@ Access JWT 수명은 900초입니다. Refresh Token 원문은 JSON에 포함하�
 기존 `RefreshTokenGenerator.hash()`로 쿠키 원문을 해시하고 DB 토큰을 조회합니다.
 누락·빈 값·없는 토큰은 `401 REFRESH_INVALID`, 만료 시각이 현재 이하이면
 `401 REFRESH_EXPIRED`, 이미 폐기된 토큰은 `401 REFRESH_REUSED`입니다.
-검사 순서는 만료, 폐기, 계정 상태 순입니다. 비활성 계정은 A03 정책과 동일하게
-`401 INVALID_CREDENTIALS`로 거절합니다. CSRF 실패는 기존 필터의 `403 CSRF_INVALID`입니다.
+검사 순서는 만료, 폐기, 계정 상태 순입니다. 비활성 계정은
+`401 REFRESH_INVALID`로 거절합니다. CSRF 실패는 기존 필터의 `403 CSRF_INVALID`입니다.
 
 정상 토큰은 새 난수와 해시를 생성하고 같은 family ID로 새 행을 저장합니다.
 기존 행의 `revoked_at`과 `replaced_by_token_id`를 설정하고 JWT를 발급합니다.
