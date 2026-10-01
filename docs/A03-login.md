@@ -4,7 +4,7 @@
 
 `POST /api/auth/login`에 JSON으로 `email`, `password`를 보냅니다.
 먼저 [A01](A01-csrf.md)을 호출해 같은 세션 쿠키와 `X-CSRF-TOKEN` 헤더를 함께 보내야 합니다.
-CSRF가 없거나 잘못되면 로그인 처리 전에 `403 ACCESS_DENIED`로 거절됩니다.
+CSRF가 없거나 잘못되면 로그인 처리 전에 `403 CSRF_INVALID`로 거절됩니다.
 이메일은 회원가입과 동일하게 앞뒤 공백을 제거하고 소문자로 정규화합니다.
 비밀번호는 공백을 포함한 원문 그대로 `PasswordEncoder.matches()`에 전달합니다.
 로그인 요청에는 회원가입의 비밀번호 8~32자 정책을 다시 적용하지 않습니다.

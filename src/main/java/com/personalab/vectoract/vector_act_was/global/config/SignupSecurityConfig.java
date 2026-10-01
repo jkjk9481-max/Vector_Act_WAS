@@ -27,7 +27,7 @@ public class SignupSecurityConfig {
                     response.setContentType("application/json");
                     response.setCharacterEncoding("UTF-8");
                     var body = exception instanceof CsrfException
-                            ? ErrorResponse.of(ErrorCode.ACCESS_DENIED, "CSRF 토큰이 없거나 유효하지 않습니다.")
+                            ? ErrorResponse.of(ErrorCode.CSRF_INVALID)
                             : ErrorResponse.of(ErrorCode.ACCESS_DENIED);
                     objectMapper.writeValue(response.getOutputStream(), body);
                 }))

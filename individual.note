@@ -1,0 +1,575 @@
+# VectorAct 개인 학습·작업 노트
+
+작성일: 2026-09-30
+기준: 오늘 대화에서 작업한 내용과 작성 시점의 실제 코드
+
+이 문서는 내가 백엔드 코드를 다시 읽을 때 흐름을 이해하기 위한 개인 노트다.
+예전 설명보다 아래의 '최종 규칙'을 기준으로 읽는다.
+파일 경로에서 Java 공통 경로는 src/main/java/com/personalab/vectoract/vector_act_was/ 이다.
+
+## 1. 프로젝트에서 내가 만들고 있는 부분
+
+VectorAct는 배우 지망생과 연기 전공자가 혼자 연습하고 AI 분석·피드백으로
+감정 표현, 딕션 등의 개선점을 파악하도록 돕는 웹 서비스를 목표로 한다.
+합리적인 비용의 구독 서비스는 향후 목표다.
+
+오늘 구현한 것은 그 서비스를 사용할 회원의 가입·로그인·보안 기반이다.
+AI 연기 분석, 영상 업로드, 코칭 결과, 구독 결제는 오늘 구현한 기능이 아니다.
+
+## 2. 오늘 작업한 내용과 최종 규칙
+
+| 항목 | 현재 상태 |
+| --- | --- |
+| A01 | GET /api/auth/csrf, CSRF 토큰 발급 |
+| A02 | POST /api/auth/signup, 가입 성공 시 201 |
+| A03 | POST /api/auth/login, 로그인 성공 시 200 |
+| 이름 | 1~30자, 문자만 허용, 숫자·특수문자·모든 공백 금지 |
+| 이름 전처리 | DTO와 Service 모두 name.strip() 제거. 앞뒤 공백도 오류 |
+| 가입 비밀번호 | 8~32자, UTF-8 최대 72바이트 |
+| 이메일 | 앞뒤 공백 제거 + 소문자 변환, 이메일 형식, 최대 254자 |
+| Access Token | 서명된 JWT, 900초(15분), DB 저장 안 함 |
+| Refresh Token | 난수 문자열, 최대 14일, 원문은 HttpOnly 쿠키로만 전달 |
+| Refresh 저장 | SHA-256 해시 64자리만 refresh_tokens에 저장 |
+| CSRF | 회원가입·로그인 모두 검사. 제외 설정 제거 |
+| 사용자 실제 삭제 | refresh_tokens.user_id의 ON DELETE CASCADE로 해당 토큰 삭제 |
+
+비밀번호 12~64자, 이름 공백 허용, 이름 strip(), signup/login CSRF 제외는
+작업 중 변경된 과거 정책이다. 현재 정책으로 착각하지 않는다.
+
+## 3. 전체 구조부터 이해하기
+
+```text
+브라우저의 HTTP 요청
+    ↓
+Spring Security 필터: CSRF 등의 보안 검사
+    ↓
+로그인 요청이면 LoginRateLimiter: 요청 횟수 검사
+    ↓
+요청 JSON → Request DTO 변환 및 @Valid 검증
+    ↓
+Controller: 요청을 Service에 전달
+    ↓
+Service: 업무 규칙 처리 + 트랜잭션 관리
+    ↓
+Repository: JPA를 통해 DB 조회·저장
+    ↓
+DB: 실제 테이블과 제약 조건
+    ↓
+Service 결과 → Controller의 Response DTO → ApiResponse → JSON 응답
+```
+
+- Controller: HTTP 주소, 요청·응답, 쿠키와 헤더를 담당한다.
+- Service: 중복 이메일, 비밀번호 비교, 동의 저장 등의 업무 순서를 담당한다.
+- Repository: DB 접근을 담당한다. JpaRepository의 구현은 Spring Data JPA가 제공한다.
+- Entity: DB 테이블의 데이터를 Java 객체로 표현한다. 예: User ↔ users.
+- DTO: 외부 요청이나 응답에 필요한 값만 담는 객체다.
+
+Entity를 그대로 응답하지 않는 이유는 passwordHash 같은 내부 정보가 나가지 않게 하기 위해서다.
+
+## 4. A01: CSRF 토큰을 먼저 받는 흐름
+
+읽을 파일:
+- global/config/SignupSecurityConfig.java
+- domain/member/presentation/CsrfController.java
+- domain/member/presentation/dto/CsrfResponse.java
+
+```text
+GET /api/auth/csrf
+    → 로그인 없이 접근 가능
+    → Spring Security가 CSRF 검증값을 세션에 준비
+    → CsrfController가 토큰과 헤더 이름을 응답
+    → 브라우저는 JSESSIONID 쿠키를 보관
+    → 이후 POST에 같은 세션 쿠키 + X-CSRF-TOKEN 헤더 전송
+```
+
+응답 data는 다음 모양이다.
+
+```json
+{
+  "token": "<CSRF 토큰>",
+  "headerName": "X-CSRF-TOKEN"
+}
+```
+
+중요한 코드:
+
+```java
+http.csrf(csrf -> csrf.csrfTokenRepository(new HttpSessionCsrfTokenRepository()))
+```
+
+서버 세션에 저장된 검증값을 기준으로 요청의 CSRF 토큰을 검사한다.
+CSRF는 다른 사이트가 사용자의 브라우저를 이용해 원치 않는 요청을 보내는 공격을 막기 위한 검사다.
+브라우저가 쿠키를 자동으로 전송하는 것만으로는 충분하지 않고 별도의 토큰도 맞아야 한다.
+
+```java
+new CsrfResponse(csrfToken.getToken(), csrfToken.getHeaderName())
+```
+
+Spring이 준비한 토큰을 가져온다. getToken() 호출은 지연되어 있던 토큰 생성을 실행한다.
+직접 만든 임의 문자열을 보내는 방식이 아니다. 기본 처리기가 전달용 토큰을 마스킹할 수 있으므로
+문자열을 직접 비교하거나 해석하지 않고 응답에서 받은 값을 그대로 헤더로 전달한다.
+
+permitAll()의 의미는 '로그인하지 않아도 접근 가능'이다.
+'CSRF 검사를 생략한다'는 뜻은 아니다. 현재 signup/login도 CSRF를 검사한다.
+
+토큰이 없거나 다르거나 다른 세션의 토큰이면 403 ACCESS_DENIED다.
+이 실패는 Controller 전에 발생하므로 GlobalExceptionHandler 대신
+SignupSecurityConfig의 accessDeniedHandler가 공통 ErrorResponse JSON을 작성한다.
+
+주의: A01 세부 최종 명세가 저장소에 없어서 현재 경로·응답 필드·세션 방식을 정해 구현했다.
+팀에서 확정한 별도 계약이 있다면 대조해야 한다. 자세한 호출 방법은 docs/A01-csrf.md에 있다.
+
+## 5. A02: 회원가입 코드 흐름
+
+읽는 순서:
+SignupRequest → SignupController → SignupService → User/UserConsent → Repository
+
+```text
+POST /api/auth/signup
+    → CSRF 검사
+    → SignupRequest 입력 검증
+    → SignupController
+    → SignupService.signup() 트랜잭션 시작
+        1) 약관·개인정보처리방침 버전 확인
+        2) 이메일 정규화 및 중복 조회
+        3) 비밀번호 BCrypt 해시 생성
+        4) User 저장
+        5) TERMS 동의 저장
+        6) PRIVACY 동의 저장
+        7) 대기 중인 SQL 실행, 커밋
+    → SignupResponse를 ApiResponse.created()로 감쌈
+    → 201 Created
+```
+
+### 5-1. Request의 검증 어노테이션
+
+```java
+@NotBlank @Size(min = 1, max = 30)
+@Pattern(regexp = "\\p{L}+", message = "이름은 공백 없이 문자만 사용할 수 있습니다.") String name
+```
+
+- @NotBlank: null, 빈 문자열, 공백뿐인 문자열을 거절한다.
+- @Size: 문자열 길이를 검사한다.
+- @Pattern: 정규식의 허용 문자와 맞는지 검사한다.
+- \\p{L}: Java 문자열 안에서 유니코드 문자 범주를 나타내는 정규식 표기다.
+- +: 허용 문자가 하나 이상 있어야 한다는 뜻이다.
+
+김배우, JohnSmith는 통과하고 ' 김배우', '김 배우', '김배우1', '김_배우'는 실패한다.
+이름은 한글·영문만으로 한정한 규칙이 아니라 유니코드의 문자 범주를 허용하는 규칙이다.
+name.strip()을 없앴으므로 공백 입력을 자동 수정한 뒤 통과시키지 않는다.
+
+```java
+@NotNull @AssertTrue Boolean termsAccepted
+```
+
+Boolean은 true/false 외에 null도 담을 수 있다.
+@NotNull은 누락을, @AssertTrue는 false를 막는다. 둘을 함께 써야 필수 동의를 표현할 수 있다.
+privacyAccepted도 같은 규칙이다.
+
+### 5-2. 비밀번호 길이와 바이트는 다르다
+
+```java
+@NotNull @Size(min = 8, max = 32) String password
+password.getBytes(StandardCharsets.UTF_8).length <= 72
+```
+
+문자열 길이와 UTF-8 저장 바이트 길이를 각각 검사한다.
+예를 들어 '가'는 UTF-8에서 3바이트라 24개는 72바이트, 25개는 75바이트다.
+따라서 '가' 25개는 문자열 길이 조건 안에 들어가도 바이트 조건에서 실패한다.
+Java의 @Size는 String.length() 기준이므로 모든 유니코드의 눈에 보이는 글자 수와 항상 같지는 않다.
+
+비밀번호는 strip(), 소문자 변환, 잘라내기를 하지 않는다.
+현재 규칙에는 영문·숫자·특수문자 조합 강제나 비밀번호 공백 금지를 별도로 추가하지 않았다.
+
+### 5-3. 이메일을 정규화하는 이유
+
+```java
+String normalizedEmail = email.strip().toLowerCase(Locale.ROOT);
+users.existsByEmail(normalizedEmail)
+```
+
+' ACTOR@example.com '과 'actor@example.com'을 같은 이메일로 취급한다.
+Locale.ROOT는 서버 언어 설정에 따라 소문자 변환 결과가 달라지는 것을 피하기 위한 기준이다.
+이 프로젝트에서 정한 이메일 처리 정책이며, 비밀번호에는 적용하지 않는다.
+
+### 5-4. 회원과 동의를 저장하는 핵심 코드
+
+```java
+User user = User.create(normalizedEmail, passwordEncoder.encode(password), name);
+users.saveAndFlush(user);
+consents.save(UserConsent.create(user, UserConsent.ConsentType.TERMS, requestedTerms));
+consents.save(UserConsent.create(user, UserConsent.ConsentType.PRIVACY, requestedPrivacy));
+consents.flush();
+```
+
+User.create()와 UserConsent.create()는 기존 생성 메서드를 재사용한다.
+create()는 객체를 만드는 단계이고 Repository 호출이 DB 저장을 담당한다.
+User의 @PrePersist가 저장 직전에 생성 시각 등을 채우며 UUID는 JPA가 생성한다.
+두 동의는 같은 user에 연결되므로 DB에는 동일한 user_id로 저장된다.
+평문 비밀번호는 User.create()에 넘기지 않고 BCrypt 해시만 전달한다.
+
+### 5-5. 트랜잭션, flush, 커밋, 롤백
+
+```java
+@Transactional
+public Result signup(...) { ... }
+```
+
+트랜잭션은 여러 DB 작업을 하나의 성공·실패 단위로 묶는다.
+Spring이 관리하는 Service를 Controller에서 호출할 때 트랜잭션 처리가 적용된다.
+
+- save(): 저장할 객체를 JPA에 전달한다. SQL 실행이 뒤로 미뤄질 수 있다.
+- flush(): 대기 중인 SQL을 DB에 실행한다. 최종 확정은 아니다.
+- commit: 트랜잭션의 변경을 확정한다.
+- rollback: 아직 확정되지 않은 트랜잭션의 변경을 취소한다.
+
+PRIVACY 동의 INSERT가 실패하면 이미 실행한 User와 TERMS INSERT도 함께 롤백된다.
+따라서 saveAndFlush()가 성공했다고 가입 전체가 완료된 것은 아니다.
+Service 메서드의 결과를 Controller가 받기 전에 Spring의 커밋이 성공해야 한다.
+현재 BusinessException과 Spring DB 예외는 RuntimeException 계열이어서 기본 롤백 대상이다.
+모든 종류의 예외가 무조건 기본 롤백 대상이라는 뜻은 아니다.
+
+### 5-6. 중복 조회와 DB 제약이 둘 다 필요한 이유
+
+두 요청이 동시에 들어오면 둘 다 '아직 이메일 없음'이라는 조회 결과를 받을 수 있다.
+그래서 users.email의 UNIQUE 제약도 필요하다.
+SignupService는 사용자 INSERT에서 발생한 SQL 상태 23505를 찾아 EMAIL_ALREADY_EXISTS로 바꾼다.
+getCause()는 여러 겹으로 감싸진 예외의 내부 원인을 하나씩 꺼내 보는 메서드다.
+
+현재 한계: 23505는 이메일 전용 코드가 아니라 모든 유일성 위반 코드다.
+현재 코드는 이 INSERT의 UUID 기본 키 충돌도 이메일 중복으로 분류할 수 있다.
+
+## 6. A03: 로그인 코드 흐름
+
+읽는 순서:
+LoginRequest → LoginController → LoginService → AccessTokenProvider/RefreshTokenGenerator
+→ RefreshTokenRepository → Controller의 쿠키·JSON 작성
+
+```text
+POST /api/auth/login
+    → CSRF 검사
+    → LoginRateLimiter의 IP별 횟수 검사
+    → LoginRequest 검증
+    → LoginService.login() 트랜잭션 시작
+        1) 정규화한 이메일로 회원 조회
+        2) 입력 비밀번호와 저장된 해시 비교
+        3) ACTIVE 계정인지 확인
+        4) Access JWT 생성
+        5) Refresh Token 난수 생성
+        6) Refresh Token 해시만 DB에 저장하고 커밋
+    → LoginController가 JSON과 Set-Cookie 헤더를 따로 작성
+    → 200 OK
+```
+
+### 6-1. encode()와 matches()의 역할
+
+```java
+passwordEncoder.encode(password)                  // 가입: 저장할 해시 생성
+passwords.matches(password, user.getPasswordHash()) // 로그인: 일치 여부 확인
+```
+
+BCrypt는 같은 비밀번호라도 매번 같은 문자열이 만들어진다고 가정할 수 없다.
+로그인에서 encode(password).equals(저장된해시)로 비교하지 않는다.
+matches()에 원문과 저장된 해시를 전달해야 한다.
+
+로그인에는 가입의 8~32자 길이 정책을 다시 적용하지 않는다.
+다만 null·빈 값·BCrypt 72바이트 초과는 실패하며, 입력을 잘라서 비교하지 않는다.
+' Password123! '와 'Password123!'는 서로 다른 비밀번호다.
+
+### 6-2. 없는 계정과 탈퇴 계정
+
+```java
+User user = users.findByEmail(...).orElse(null);
+passwords.matches(password, user == null ? dummyHash : user.getPasswordHash());
+```
+
+findByEmail()은 조회 결과가 없을 수 있어 Optional<User>를 반환한다.
+orElse(null)은 없을 때 null을 사용한다는 뜻이다.
+dummyHash는 없는 이메일일 때도 유효 길이의 비밀번호에 대해 BCrypt 비교를 수행하여
+계정 존재 여부에 따른 응답 시간 차이를 줄이기 위한 가짜 해시다. 가짜 로그인을 허용하지는 않는다.
+
+비밀번호 불일치, 없는 이메일, WITHDRAWN 계정은 모두 401 INVALID_CREDENTIALS다.
+외부에서 오류 메시지만 보고 이메일 존재 여부를 구분하지 않도록 한 것이다.
+
+### 6-3. 실패하면 쿠키를 주지 않는 이유
+
+LoginService 안에서 Refresh Token을 저장하고 트랜잭션이 커밋된 뒤에 Controller가 결과를 받는다.
+Controller는 그다음에 Set-Cookie 헤더를 만든다.
+DB 저장·커밋에 실패하면 성공 JSON과 Refresh Token 쿠키를 발급하는 부분에 도달하지 않는다.
+토큰 문자열을 메모리에 생성했더라도 DB에 저장하지 못한 토큰을 사용자에게 전달하지 않는 구조다.
+
+## 7. 세 가지 토큰과 쿠키를 구분하기
+
+| 구분 | 목적 | 현재 전달·저장 방식 |
+| --- | --- | --- |
+| CSRF 토큰 | 요청이 CSRF 검증을 통과하는지 확인 | A01 JSON → X-CSRF-TOKEN 헤더, 서버 세션에 검증값 |
+| JSESSIONID | 어떤 CSRF 세션인지 연결 | 브라우저 쿠키 |
+| Access JWT | 회원 식별자와 유효기간을 가진 접근 토큰 | 로그인 JSON, DB 저장 안 함 |
+| Refresh Token | 향후 Access Token 재발급에 사용할 토큰 | HttpOnly 쿠키, DB에는 해시만 |
+
+CSRF 토큰을 받았다고 로그인한 것은 아니다.
+현재 JSESSIONID 세션에 로그인 인증 정보를 저장하는 방식도 아니다.
+Access JWT 발급·검증 도구는 있지만 요청 헤더의 Bearer 토큰을 읽어
+보호 API의 인증으로 연결하는 필터는 아직 구현하지 않았다.
+따라서 'JWT가 발급되므로 보호 API 인증도 모두 완료됐다'고 설명하면 안 된다.
+
+## 8. AccessTokenProvider에서 중요한 코드
+
+```java
+public static final long EXPIRES_IN = 900;
+JwtClaimsSet.builder()
+    .issuer(issuer)
+    .subject(userId.toString())
+    .issuedAt(now)
+    .expiresAt(now.plusSeconds(EXPIRES_IN))
+    .id(UUID.randomUUID().toString())
+    .claim("token_use", "access")
+    .build();
+```
+
+claim은 JWT 안에 들어가는 정보 항목이다.
+
+| 항목 | 의미 |
+| --- | --- |
+| iss | 누가 발급했는지 나타내는 issuer |
+| sub | 이 프로젝트에서는 회원 UUID |
+| iat | 발급 시각 |
+| exp | 만료 시각 |
+| jti | 개별 토큰 식별자 |
+| token_use | access 토큰이라는 용도 |
+
+환경변수의 비밀키로 HS256 서명을 생성한다.
+Base64는 키나 데이터를 문자열로 표현하는 인코딩이지 암호화가 아니다.
+서명된 JWT의 본문도 비밀로 숨겨지는 것이 아니므로 비밀번호 등 민감한 값을 넣지 않는다.
+
+verify()는 서명, 만료, 발급자, 회원 UUID 형식, access 용도, 최대 900초 수명을 검증한다.
+Duration.ZERO는 만료 검증에서 추가 시간 여유를 두지 않는 설정이다.
+검증 실패 시 JwtException이 발생한다. 이 도구를 실제 인증 필터에 연결하는 것은 남은 작업이다.
+
+## 9. Refresh Token: 난수 → 해시 → DB → 쿠키
+
+읽을 파일: global/auth/RefreshTokenGenerator.java
+
+```java
+byte[] bytes = new byte[32];
+random.nextBytes(bytes);
+Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+```
+
+SecureRandom으로 32바이트, 즉 256비트 난수를 만들고 URL·쿠키에 넣기 쉬운 문자열로 표현한다.
+이 값이 브라우저에 줄 원문이다. Refresh Token은 현재 JWT가 아니다.
+
+```java
+HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+    .digest(rawToken.getBytes(StandardCharsets.UTF_8)));
+```
+
+SHA-256 결과 32바이트를 16진수로 표현하면 64자리다. DB에는 이 해시만 저장한다.
+사람이 정하는 비밀번호에는 BCrypt를, 충분히 긴 난수 토큰에는 SHA-256을 사용한다.
+향후 재발급 시 받은 원문을 같은 방법으로 해시해 DB 기록과 대조할 수 있지만 A04는 아직 없다.
+
+```java
+ResponseCookie.from("refreshToken", result.refreshToken())
+    .httpOnly(true)
+    .secure(secureCookie)
+    .sameSite("Lax")
+    .path("/api/auth")
+    .maxAge(Duration.ofDays(14))
+    .build();
+```
+
+- HttpOnly: 브라우저 JavaScript의 쿠키 읽기 API에서 접근하지 못하게 한다.
+- Secure: HTTPS에서만 쿠키를 전송하게 한다.
+- SameSite=Lax: 다른 사이트에서 시작한 요청의 쿠키 전송을 제한하는 정책이다.
+- Path: 쿠키가 전송될 요청 경로 범위를 /api/auth로 제한한다.
+- Max-Age: 브라우저 쿠키 보관 수명이다. DB의 expires_at도 별도로 저장한다.
+
+HttpOnly라고 쿠키가 요청에 전송되지 않는 것은 아니다. 브라우저는 조건에 맞으면 자동 전송한다.
+그래서 CSRF 보호와 쿠키 속성을 함께 이해해야 한다.
+Refresh Token 원문은 LoginResponse JSON에 넣지 않는다.
+응답에는 Cache-Control: no-store와 Pragma: no-cache도 설정한다.
+
+## 10. refresh_tokens 테이블 읽기
+
+| 컬럼 | 의미 |
+| --- | --- |
+| id | 토큰 기록 UUID |
+| user_id | 소유 회원의 users.id를 참조하는 외래 키 |
+| token_hash | SHA-256 16진수 해시, VARCHAR(64), NOT NULL, UNIQUE |
+| family_id | 같은 재발급 계보를 구분할 UUID. 새 로그인마다 새 값 |
+| issued_at | 발급 시각 |
+| expires_at | 발급 시각 + 14일 |
+| revoked_at | 폐기 시각 자리. 신규 발급에서는 null |
+| replaced_by_token_id | 교체된 다음 토큰 ID 자리. 신규 발급에서는 null |
+
+VARCHAR(64)는 최대 64자라는 뜻이고, CHECK(char_length(token_hash) = 64)는 정확히 64자를 요구한다.
+오늘은 엔티티의 길이·CHECK와 SQL 정의를 맞췄다.
+
+```java
+@OnDelete(action = OnDeleteAction.CASCADE)
+```
+
+DB의 user_id 외래 키에 ON DELETE CASCADE를 표현한다.
+사용자 행이 실제 삭제되면 연결된 Refresh Token 행도 DB가 삭제한다.
+토큰만 삭제한다고 사용자가 삭제되어서는 안 된다.
+계정 상태를 WITHDRAWN으로 바꾸는 것은 DELETE가 아니므로 연쇄 삭제를 실행하지 않는다.
+다른 자식 테이블의 제약까지 자동으로 해결하는 기능은 아니다.
+
+운영은 ddl-auto: none이므로 어노테이션을 바꿔도 기존 DB가 자동 수정되지 않는다.
+- 신규 테이블: docs/sql/A03_refresh_tokens.sql
+- 이전 A03 테이블 보정: docs/sql/A03_refresh_tokens_alignment.sql
+
+보정 SQL은 기존 값이 64자가 아니면 실패하도록 하여 임의로 잘라 저장하지 않는다.
+실제 운영 DB에는 아직 실행하지 않았다. 기존 FK 이름이 다르면 SQL도 대조해야 한다.
+
+## 11. 요청 횟수 제한과 오류가 처리되는 위치
+
+LoginWebConfig가 /api/auth/login에 LoginRateLimiter를 연결한다.
+기본값은 서버가 확인한 IP별 첫 요청부터 60초 동안 10회다.
+CSRF를 통과한 요청의 성공·실패·잘못된 본문 모두 횟수에 포함한다.
+
+```java
+public synchronized void acquire(String address)
+```
+
+synchronized는 여러 요청이 동시에 같은 횟수를 읽어 제한을 뚫는 일을 막기 위해
+이 메서드의 동시 실행을 한 객체 안에서 직렬화한다.
+시간이 지난 항목은 제거하고 저장 IP 수에도 10,000개 상한을 둔다.
+현재는 서버 메모리 방식이므로 재시작 시 사라지고 여러 서버끼리 횟수를 공유하지 않는다.
+프록시 뒤의 실제 사용자 IP 처리는 신뢰할 프록시 설정과 함께 확인해야 한다.
+
+| 상황 | 상태 / 코드 | 처리 위치 |
+| --- | --- | --- |
+| CSRF 누락·불일치 | 403 ACCESS_DENIED | SecurityFilterChain의 accessDeniedHandler |
+| 회원가입 입력 오류 | 400 VALIDATION_ERROR | GlobalExceptionHandler |
+| 약관 버전 불일치·미설정 | 400 TERMS_VERSION_INVALID | Service → GlobalExceptionHandler |
+| 이메일 중복 | 409 EMAIL_ALREADY_EXISTS | Service → GlobalExceptionHandler |
+| 로그인 인증 실패·탈퇴 | 401 INVALID_CREDENTIALS | Service → GlobalExceptionHandler |
+| 로그인 입력 누락·형식 오류 | 401 INVALID_CREDENTIALS | LoginController의 전용 @ExceptionHandler |
+| 로그인 횟수 초과 | 429 RATE_LIMITED | Interceptor → GlobalExceptionHandler |
+| 예상치 못한 DB 등 오류 | 500 INTERNAL_SERVER_ERROR | GlobalExceptionHandler |
+
+HTTP 상태는 ResponseEntity가 결정하고 ApiResponse는 응답 본문을 만든다.
+ApiResponse.created()만 호출한다고 HTTP 상태가 자동으로 201이 되는 것은 아니다.
+현재 공통 JSON 필드는 success, data, message, error다.
+README에 남아 있는 status/timestamp 예제를 현재 응답 규격으로 착각하지 않는다.
+
+## 12. 자주 나오는 Java/Spring 문법 메모
+
+| 코드 | 쉽게 이해하기 |
+| --- | --- |
+| @Service / @Component | Spring이 만들어 관리할 객체임을 표시 |
+| @Configuration / @Bean | 설정 클래스 / Spring에 등록할 객체 생성 메서드 |
+| 생성자 주입 | 필요한 Repository·인코더 객체를 Spring이 생성자로 전달 |
+| final 필드 | 생성자에서 정한 참조를 나중에 다른 참조로 바꾸지 못함 |
+| @Value | application.yaml 등의 설정값을 읽어 주입 |
+| @RestController | 메서드 결과를 JSON 등 HTTP 본문으로 반환 |
+| @RequestBody | JSON 본문을 Java 요청 객체로 변환 |
+| @Valid | DTO에 선언된 검증 어노테이션 실행 |
+| @RequiredArgsConstructor | Lombok이 final 필드 등을 받는 생성자 생성 |
+| record | 데이터 중심 타입. 생성자와 name() 같은 접근자를 자동 제공 |
+| var | 오른쪽 식을 보고 컴파일러가 지역 변수 타입을 추론 |
+| 조건 ? A : B | 조건이 참이면 A, 거짓이면 B |
+| && / \|\| / ! | 둘 다 참 / 하나라도 참 / 참·거짓 반전 |
+| throw | 정상 흐름을 중단하고 예외를 호출한 쪽으로 전달 |
+| try/catch | 특정 작업에서 발생한 예외를 잡아 처리 |
+| instanceof | 어떤 타입인지 검사. 패턴 변수로 형변환 결과를 사용 가능 |
+| -> | 람다. 전달할 동작을 간단히 작성 |
+| this::validateClaims | 현재 객체의 메서드를 검증 동작으로 전달하는 메서드 참조 |
+
+record의 기본 toString()은 필드 내용을 포함한다.
+비밀번호나 토큰을 담는 요청·결과에는 toString()을 별도로 작성해 값이 로그에 나오지 않게 했다.
+이것만으로 모든 로그 유출이 막히는 것은 아니므로 요청 원문을 별도로 로그에 남기면 안 된다.
+
+## 13. 실행에 필요한 설정
+
+설정 파일: src/main/resources/application.yaml
+
+| 환경변수 | 의미 / 기본값 |
+| --- | --- |
+| DB_URL | 기본 jdbc:postgresql://localhost:5432/vector_act |
+| DB_USERNAME / DB_PASSWORD | DB 계정 / 비밀번호 |
+| SIGNUP_TERMS_VERSION | 현재 허용할 약관 버전. 미설정 시 가입 거절 |
+| SIGNUP_PRIVACY_VERSION | 현재 허용할 개인정보처리방침 버전 |
+| JWT_SECRET_BASE64 | 필수. 최소 32바이트 난수 키의 Base64 표현 |
+| JWT_ISSUER | 기본 vector-act |
+| REFRESH_COOKIE_SECURE | 기본 true. 로컬 HTTP 개발에서만 false |
+| CSRF_SESSION_COOKIE_SECURE | 기본 true. 로컬 HTTP 개발에서만 false |
+| LOGIN_RATE_LIMIT_MAX_ATTEMPTS | 기본 10 |
+| LOGIN_RATE_LIMIT_WINDOW_SECONDS | 기본 60 |
+
+비밀키가 없거나 Base64 형식이 아니거나 디코딩한 키가 32바이트 미만이면 시작이 실패한다.
+비밀키와 DB 비밀번호는 소스나 이 노트에 적지 않는다.
+테스트는 별도 H2 설정과 실행 시 생성되는 난수 JWT 키를 사용한다.
+
+## 14. 오늘 확인한 빌드·테스트 결과
+
+이 노트 작성 때 테스트를 새로 실행하지는 않았다.
+오늘 정책 수정 후 실행한 빌드 결과와 저장된 테스트 XML을 확인한 기록이다.
+
+- compileJava 성공
+- build 성공: JAR 생성과 test/check 포함
+- 전체 27개 테스트 성공, 실패 0
+- git diff --check 확인
+
+| 테스트 클래스 | 개수 | 확인 내용 |
+| --- | --- | --- |
+| SignupIntegrationTests | 9 | 가입, 중복, 버전, 이름·비밀번호 검증, 해시 저장, 동의 저장 실패 롤백 |
+| LoginIntegrationTests | 9 | 로그인·쿠키·해시, 잘못된 계정, 제한, DB 실패, 해시 길이, 연쇄 삭제 방향 |
+| CsrfIntegrationTests | 2 | 실제 A01 토큰으로 가입·로그인, 누락·변조·다른 세션 차단 |
+| AccessTokenProviderTests | 4 | JWT 발급·검증, 변조·다른 키·만료·claim·키 설정 오류 |
+| LoginRateLimiterTests | 2 | IP별 제한·시간창 초기화·동시 요청 |
+| VectorActWasApplicationTests | 1 | Spring 애플리케이션 컨텍스트 시작 |
+
+한 테스트 메서드 안에서 여러 입력값을 반복 검사하는 경우가 있어 입력 사례 수는 27개보다 많다.
+통합 테스트는 H2 PostgreSQL 호환 모드 기준이다. 실제 PostgreSQL 검증 완료라는 의미는 아니다.
+CSRF 통합 테스트는 csrf() 도우미로 통과시키지 않고 A01에서 받은 실제 토큰과 세션을 사용한다.
+회원가입·로그인의 개별 기능 테스트는 csrf() 도우미로 유효한 CSRF 조건을 준비한다.
+
+기존 빌드 출력 정리 오류가 있어 임시 Gradle init script로 출력 경로만 분리해 실행했다.
+당시 명령: .\gradlew.bat compileJava build --init-script <임시 init script 경로>
+결과 위치: build/policy-1790735648899/test-results/test/
+HTML 보고서: build/policy-1790735648899/reports/tests/test/index.html
+일반적인 재실행 명령은 .\gradlew.bat compileJava build 이다. 임시 스크립트는 저장소 필수 파일이 아니다.
+빌드 중 RefreshToken의 Hibernate @Check 관련 deprecated API 경고가 있었지만 실패는 아니었다.
+
+## 15. 아직 구현하지 않은 것과 다음 확인 사항
+
+- A04 Refresh 재발급: 만료 검사, 토큰 회전, 재사용 탐지 등의 실제 처리
+- A05 Logout: 토큰 폐기와 쿠키 삭제
+- Bearer Access JWT를 보호 API의 인증으로 연결하는 필터
+- 실제 PostgreSQL 테이블·보정 SQL 적용과 환경 검증
+- 실제 HTTPS 브라우저에서 세션·Refresh 쿠키 전달 확인
+- 프런트·백엔드 출처가 다를 경우 CORS와 쿠키 배포 정책 합의
+- 서버가 여러 대일 때 CSRF 세션과 요청 제한 정보의 공유 방식
+- 팀 A01 최종 계약, 약관 버전, DB 규격과 현재 구현의 최종 대조
+- AI 연기 분석·영상 처리·피드백 저장·구독 기능
+
+오늘 작업에서 git commit은 실행하지 않았다.
+README는 현재 응답 규격·UUID·파일 이름과 어긋나는 부분이 있으므로 실제 코드와 이 노트를 함께 본다.
+
+## 16. 내가 설명할 수 있어야 하는 질문
+
+1. 이름은 왜 strip()하지 않고 이메일은 strip()하는가?
+   → 이름 공백은 거절하는 정책이고 이메일 공백은 정규화하는 정책이기 때문이다.
+
+2. 가입 시 encode(), 로그인 시 matches()를 사용하는 이유는?
+   → 저장할 해시 생성과 입력 원문 검증은 다른 작업이며 BCrypt 해시 문자열을 재생성해 단순 비교하면 안 된다.
+
+3. saveAndFlush() 다음에 동의 저장이 실패하면 회원은 남는가?
+   → 같은 트랜잭션이므로 롤백된다. flush는 커밋이 아니다.
+
+4. Refresh Token 원문을 DB에 저장하지 않는 이유는?
+   → DB에 즉시 사용할 수 있는 토큰 원문을 남기지 않고 해시로 대조할 수 있게 하기 위해서다.
+
+5. permitAll인데 왜 CSRF 때문에 403이 발생하는가?
+   → 인증 전 접근 허용과 CSRF 검사는 별도 조건이기 때문이다.
+
+6. JWT를 발급했으니 모든 인증 구현이 끝났는가?
+   → 아니다. 검증 도구를 요청 인증에 연결하는 필터와 재발급·로그아웃 처리가 남아 있다.
+
+7. 사용자를 탈퇴 상태로 바꾸면 ON DELETE CASCADE가 실행되는가?
+   → 아니다. 사용자 행을 실제 DELETE할 때 적용된다.
+
+8. 테스트 27개가 통과했으면 운영도 모두 검증됐는가?
+   → 아니다. 테스트 DB와 모의 HTTP에서 검증했고 실제 PostgreSQL·HTTPS·배포 설정은 별도 확인이 필요하다.

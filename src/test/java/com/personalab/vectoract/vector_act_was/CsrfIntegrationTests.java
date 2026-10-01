@@ -65,7 +65,7 @@ class CsrfIntegrationTests {
                     post(path).session(other.session()).header(csrf.header(), csrf.token())}) {
                 mvc.perform(request.contentType(MediaType.APPLICATION_JSON).content(path.endsWith("signup") ? SIGNUP : LOGIN))
                         .andExpect(status().isForbidden()).andExpect(jsonPath("$.success").value(false))
-                        .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"))
+                        .andExpect(jsonPath("$.error.code").value("CSRF_INVALID"))
                         .andExpect(header().doesNotExist("Set-Cookie"));
             }
         }
@@ -74,11 +74,30 @@ class CsrfIntegrationTests {
         assertThat(refreshTokens.count()).isZero();
     }
 
+    @Test
+    void invalidatedSessionRequiresNewTokenAndSession() throws Exception {
+        var old = issue();
+        old.session().invalidate();
+        var renewed = issue();
+
+        mvc.perform(post("/api/auth/signup").session(renewed.session()).header(old.header(), old.token())
+                        .contentType(MediaType.APPLICATION_JSON).content(SIGNUP))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("CSRF_INVALID"));
+        assertThat(users.count()).isZero();
+
+        mvc.perform(post("/api/auth/signup").session(renewed.session()).header(renewed.header(), renewed.token())
+                        .contentType(MediaType.APPLICATION_JSON).content(SIGNUP))
+                .andExpect(status().isCreated());
+    }
+
     private Issued issue() throws Exception {
         var result = mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.token").isNotEmpty())
+                .andExpect(jsonPath("$.data.token").isString())
                 .andExpect(jsonPath("$.data.headerName").value("X-CSRF-TOKEN"))
+                .andExpect(jsonPath("$.data.expiresAt").doesNotExist())
                 .andExpect(header().string("Cache-Control", "no-store")).andReturn();
         var session = (MockHttpSession) result.getRequest().getSession(false);
         assertThat(session).isNotNull();
