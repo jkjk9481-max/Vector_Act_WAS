@@ -10,12 +10,16 @@ import org.springframework.security.web.csrf.CsrfException;
 import com.personalab.vectoract.vector_act_was.global.common.response.ErrorResponse;
 import com.personalab.vectoract.vector_act_was.global.error.ErrorCode;
 import tools.jackson.databind.ObjectMapper;
+import com.personalab.vectoract.vector_act_was.global.auth.AccessTokenProvider;
+import com.personalab.vectoract.vector_act_was.global.auth.MeAuthenticationFilter;
+import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 
 // Spring 설정 클래스입니다. @Bean 메서드의 결과를 Spring이 관리하는 객체로 등록합니다.
 @Configuration
 public class SignupSecurityConfig {
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper objectMapper) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper objectMapper,
+                                             AccessTokenProvider accessTokenProvider) throws Exception {
         // SecurityFilterChain은 Controller에 도달하기 전에 요청의 보안 조건을 검사합니다.
         // CSRF는 다른 사이트에서 사용자 몰래 보내는 요청을 막는 검사입니다.
         // A01에서 발급한 CSRF 토큰을 세션에 보관합니다. POST 요청은 같은 세션과 토큰이 필요합니다.
@@ -27,7 +31,9 @@ public class SignupSecurityConfig {
                     response.setContentType("application/json");
                     response.setCharacterEncoding("UTF-8");
                     var body = exception instanceof CsrfException
+                            // CSRF 때문에 막힘
                             ? ErrorResponse.of(ErrorCode.CSRF_INVALID)
+                            //  다른 이유로 접근 거부
                             : ErrorResponse.of(ErrorCode.ACCESS_DENIED);
                     objectMapper.writeValue(response.getOutputStream(), body);
                 }))
@@ -37,6 +43,8 @@ public class SignupSecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/signup", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
                         .anyRequest().authenticated()); // 나머지 요청은 인증된 사용자만 허용합니다.
         // 위 규칙을 적용한 필터 체인을 완성해 반환합니다.
+        http.addFilterBefore(new MeAuthenticationFilter(accessTokenProvider, objectMapper),
+                AnonymousAuthenticationFilter.class);
         return http.build();
     }
 }
