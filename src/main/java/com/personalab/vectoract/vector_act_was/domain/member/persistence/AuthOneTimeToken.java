@@ -36,9 +36,10 @@ public class AuthOneTimeToken {
     private User user;
 
     // 용도를 문자열로 저장합니다. 다른 용도의 토큰을 탈퇴 인증에 사용할 수 없게 구분합니다.
+    // Java 필드 tokenType을 DB의 token_type 컬럼에 명시적으로 연결합니다.
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    private Purpose purpose;
+    @Column(name = "token_type", nullable = false, length = 30)
+    private TokenType tokenType;
 
     // 명세의 VARCHAR(255)를 사용합니다. 현재 SHA-256 구현의 실제 해시 길이는 64자입니다.
     @Column(name = "token_hash", nullable = false, unique = true, length = 255)
@@ -58,7 +59,7 @@ public class AuthOneTimeToken {
     public static AuthOneTimeToken createReauth(User user, String tokenHash, OffsetDateTime now) {
         var token = new AuthOneTimeToken();
         token.user = user;
-        token.purpose = Purpose.REAUTH;
+        token.tokenType = TokenType.REAUTH;
         token.tokenHash = tokenHash;
         token.createdAt = now;
         token.expiresAt = now.plusMinutes(5);
@@ -72,5 +73,5 @@ public class AuthOneTimeToken {
         if (createdAt == null) createdAt = OffsetDateTime.now(ZoneOffset.UTC);
     }
 
-    public enum Purpose { PASSWORD_RESET, REAUTH }
+    public enum TokenType { PASSWORD_RESET, REAUTH }
 }

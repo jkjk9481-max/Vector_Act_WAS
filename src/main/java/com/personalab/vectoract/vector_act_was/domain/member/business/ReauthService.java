@@ -71,7 +71,7 @@ public class ReauthService {
         }
         // 만료 시각과 현재 시각이 같아도 만료입니다. DB 쿼리의 expiresAt > now 조건이 이를 보장합니다.
         int consumed = tokens.consumeIfUsable(generator.hash(rawToken), userId,
-                AuthOneTimeToken.Purpose.REAUTH, OffsetDateTime.now(ZoneOffset.UTC));
+                AuthOneTimeToken.TokenType.REAUTH, OffsetDateTime.now(ZoneOffset.UTC));
         if (consumed != 1) {
             // 다른 회원·다른 용도·만료·사용 완료·없는 토큰은 모두 인증에 사용할 수 없습니다.
             throw new BusinessException(ErrorCode.ACCESS_INVALID);

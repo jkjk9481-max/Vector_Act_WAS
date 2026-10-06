@@ -56,9 +56,14 @@ A08과 같은 사용자 행을 잠그므로 동시에 비밀번호를 변경할 
 운영 설정이 `ddl-auto: none`이므로 배포 시 [PostgreSQL DDL](sql/A09_auth_one_time_tokens.sql)을
 별도로 적용해야 합니다. 이번 작업에서는 운영 DB에 실행하지 않았습니다.
 
-`auth_one_time_tokens`에는 `id`, `user_id`, `purpose`, `token_hash`, `expires_at`, `used_at`,
-`created_at`을 저장합니다. 명세에서 컬럼명이 생략된 용도 구분은 `purpose VARCHAR(30)`으로
-정했으며 `PASSWORD_RESET`과 `REAUTH`를 사용합니다. 회원 소유권 확인을 위해 `user_id`를 둡니다.
+`auth_one_time_tokens`에는 `id`, `user_id`, `token_type`, `token_hash`, `expires_at`, `used_at`,
+`created_at`을 저장합니다. 용도 구분은 `token_type VARCHAR(30)`이며
+`PASSWORD_RESET`과 `REAUTH`를 사용합니다. Java에서는 `tokenType` 필드와 `TokenType` enum으로
+표현합니다. 회원 소유권 확인을 위해 `user_id`를 둡니다.
+
+이전 `purpose` 컬럼으로 테이블을 이미 생성했다면
+[컬럼명 변경 SQL](sql/A09_token_type_alignment.sql)을 한 번 적용해야 합니다.
+신규 DB는 수정된 생성 DDL만 적용합니다. 이번 작업에서 실제 DB의 컬럼을 변경하지는 않았습니다.
 
 `token_hash`는 명세대로 `VARCHAR(255) UNIQUE`이고 실제 SHA-256 해시는 64자입니다.
 원문은 DB에 저장하지 않습니다. `created_at`의 DB 기본값은 `now()`입니다.

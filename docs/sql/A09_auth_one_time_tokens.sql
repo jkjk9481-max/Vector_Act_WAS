@@ -3,7 +3,7 @@
 CREATE TABLE auth_one_time_tokens (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL CONSTRAINT fk_auth_one_time_tokens_user REFERENCES users(id) ON DELETE CASCADE,
-    purpose VARCHAR(30) NOT NULL CHECK (purpose IN ('PASSWORD_RESET', 'REAUTH')),
+    token_type VARCHAR(30) NOT NULL CHECK (token_type IN ('PASSWORD_RESET', 'REAUTH')),
     token_hash VARCHAR(255) NOT NULL UNIQUE,
     expires_at TIMESTAMPTZ NOT NULL,
     used_at TIMESTAMPTZ,

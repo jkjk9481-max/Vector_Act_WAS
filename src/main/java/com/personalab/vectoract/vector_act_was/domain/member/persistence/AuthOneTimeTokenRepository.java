@@ -26,9 +26,9 @@ public interface AuthOneTimeTokenRepository extends JpaRepository<AuthOneTimeTok
     @Modifying(flushAutomatically = true)
     @Query("""
             update AuthOneTimeToken t set t.usedAt = :now
-            where t.tokenHash = :hash and t.user.id = :userId and t.purpose = :purpose
+            where t.tokenHash = :hash and t.user.id = :userId and t.tokenType = :tokenType
               and t.usedAt is null and t.expiresAt > :now
             """)
     int consumeIfUsable(@Param("hash") String hash, @Param("userId") UUID userId,
-                        @Param("purpose") AuthOneTimeToken.Purpose purpose, @Param("now") OffsetDateTime now);
+                        @Param("tokenType") AuthOneTimeToken.TokenType tokenType, @Param("now") OffsetDateTime now);
 }

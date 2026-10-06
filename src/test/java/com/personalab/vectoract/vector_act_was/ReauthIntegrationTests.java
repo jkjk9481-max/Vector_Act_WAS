@@ -103,7 +103,7 @@ class ReauthIntegrationTests {
         var stored = tokens.findByTokenHash(generator.hash(raw)).orElseThrow();
         assertThat(stored.getTokenHash()).hasSize(64).isNotEqualTo(raw);
         assertThat(stored.getUser().getId()).isEqualTo(user.getId());
-        assertThat(stored.getPurpose()).isEqualTo(AuthOneTimeToken.Purpose.REAUTH);
+        assertThat(stored.getTokenType()).isEqualTo(AuthOneTimeToken.TokenType.REAUTH);
         assertThat(stored.getUsedAt()).isNull();
         assertThat(Duration.between(stored.getCreatedAt(), stored.getExpiresAt())).isEqualTo(Duration.ofMinutes(5));
         // DB는 나노초를 반올림할 수 있으므로 JSON과 저장값은 밀리초 단위로 비교합니다.
@@ -198,7 +198,7 @@ class ReauthIntegrationTests {
     @Test
     void insertFailureDoesNotReturnOrPersistToken() throws Exception {
         // 실제 DB 제약으로 INSERT를 실패시켜 롤백과 500 응답을 확인합니다. finally에서 제약을 제거합니다.
-        jdbc.execute("ALTER TABLE auth_one_time_tokens ADD CONSTRAINT a09_insert_failure CHECK (purpose = 'PASSWORD_RESET')");
+        jdbc.execute("ALTER TABLE auth_one_time_tokens ADD CONSTRAINT a09_insert_failure CHECK (token_type = 'PASSWORD_RESET')");
         try {
             password(PASSWORD).andExpect(status().isInternalServerError()).andExpect(jsonPath("$.error.code").value("INTERNAL_ERROR"))
                     .andExpect(jsonPath("$.data.reauthToken").doesNotExist());
@@ -237,12 +237,12 @@ class ReauthIntegrationTests {
     }
 
     @Test
-    void expiredAndWrongPurposeTokensCannotBeUsed() throws Exception {
+    void expiredAndWrongTokenTypeTokensCannotBeUsed() throws Exception {
         String expired = issue();
         jdbc.update("UPDATE auth_one_time_tokens SET expires_at = ? WHERE token_hash = ?", OffsetDateTime.now().minusSeconds(1), generator.hash(expired));
         assertInvalid(() -> consume(user.getId(), expired));
         String reset = issue();
-        jdbc.update("UPDATE auth_one_time_tokens SET purpose = 'PASSWORD_RESET' WHERE token_hash = ?", generator.hash(reset));
+        jdbc.update("UPDATE auth_one_time_tokens SET token_type = 'PASSWORD_RESET' WHERE token_hash = ?", generator.hash(reset));
         assertInvalid(() -> consume(user.getId(), reset));
         assertThat(tokens.findAll()).allSatisfy(token -> assertThat(token.getUsedAt()).isNull());
     }
@@ -253,7 +253,7 @@ class ReauthIntegrationTests {
         var now = OffsetDateTime.parse("2026-01-01T00:00:00Z");
         var token = tokens.saveAndFlush(AuthOneTimeToken.createReauth(user, generator.hash(generator.generate()), now.minusMinutes(5)));
         Integer updated = new TransactionTemplate(transactionManager).execute(status -> tokens.consumeIfUsable(
-                token.getTokenHash(), user.getId(), AuthOneTimeToken.Purpose.REAUTH, now));
+                token.getTokenHash(), user.getId(), AuthOneTimeToken.TokenType.REAUTH, now));
         assertThat(updated).isZero();
     }
 
