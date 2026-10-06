@@ -14,6 +14,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
@@ -31,6 +32,7 @@ class UpdateMeIntegrationTests {
     @Autowired UserRepository users;
     @Autowired AccessTokenProvider tokens;
     @Autowired JdbcTemplate jdbc;
+    @Autowired ObjectMapper objectMapper;
     private User user;
     private static final OffsetDateTime OLD_UPDATED_AT = OffsetDateTime.parse("2020-01-01T00:00:00Z");
 
@@ -48,13 +50,13 @@ class UpdateMeIntegrationTests {
                         .param("userId", other.getId().toString())
                         .header("Authorization", "Bearer " + tokens.issue(user.getId()))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"새 이름\",\"userId\":\"" + other.getId()
+                        .content("{\"name\":\"새이름\",\"userId\":\"" + other.getId()
                                 + "\",\"email\":\"changed@example.com\",\"accountStatus\":\"WITHDRAWN\"}"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.userId").value(user.getId().toString()))
-                .andExpect(jsonPath("$.data.name").value("새 이름"))
+                .andExpect(jsonPath("$.data.name").value("새이름"))
                 .andExpect(jsonPath("$.data.email").value(user.getEmail()))
                 .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
         Map<String, Object> data = JsonPath.read(response, "$.data");
@@ -62,7 +64,7 @@ class UpdateMeIntegrationTests {
         assertThat(OffsetDateTime.parse((String) data.get("createdAt")).toInstant().truncatedTo(ChronoUnit.MILLIS))
                 .isEqualTo(user.getCreatedAt().toInstant().truncatedTo(ChronoUnit.MILLIS));
         var saved = users.findById(user.getId()).orElseThrow();
-        assertThat(saved.getName()).isEqualTo("새 이름");
+        assertThat(saved.getName()).isEqualTo("새이름");
         assertThat(saved.getUpdatedAt()).isAfter(OLD_UPDATED_AT);
         assertThat(saved.getEmail()).isEqualTo(user.getEmail());
         assertThat(saved.getPasswordHash()).isEqualTo(user.getPasswordHash());
@@ -86,10 +88,31 @@ class UpdateMeIntegrationTests {
 
     @ParameterizedTest
     @ValueSource(strings = {"{}", "{\"name\":null}", "{\"name\":\"\"}", "{\"name\":\"   \"}",
-            "{\"name\":\"1234567890123456789012345678901\"}", "{", ""})
+            "{\"name\":\"abcdefghijklmnopqrstuvwxyzabcde\"}", "{", ""})
     void rejectsInvalidBodyWithoutChangingUser(String body) throws Exception {
         mvc.perform(patch("/api/users/me").header("Authorization", "Bearer " + tokens.issue(user.getId()))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
+        assertUnchanged();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"홍길동", "Alice", "홍Alice", "Élodie", "山田太郎"})
+    void acceptsLettersOnly(String name) throws Exception {
+        mvc.perform(patch("/api/users/me").header("Authorization", "Bearer " + tokens.issue(user.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("name", name))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.name").value(name));
+        assertThat(users.findById(user.getId()).orElseThrow().getName()).isEqualTo(name);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {" 홍길동", "홍길동 ", "홍 길동", "홍\t길동", "홍길동\n", "홍\u00A0길동",
+            "홍\u3000길동", "123", "홍길동1", "홍길동１", "홍길동!", "홍_길동", "Anne-Marie", "O'Neil", "홍😀"})
+    void rejectsNonLettersWithoutChangingUser(String name) throws Exception {
+        mvc.perform(patch("/api/users/me").header("Authorization", "Bearer " + tokens.issue(user.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of("name", name))))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
         assertUnchanged();
     }
