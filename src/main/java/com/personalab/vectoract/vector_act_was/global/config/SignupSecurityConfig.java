@@ -34,10 +34,15 @@ public class SignupSecurityConfig {
         // CSRF는 다른 사이트에서 사용자 몰래 보내는 요청을 막는 검사입니다.
         // A01에서 발급한 CSRF 토큰을 세션에 보관합니다. POST 요청은 같은 세션과 토큰이 필요합니다.
         // permitAll은 로그인 전 접근을 허용한다는 뜻이며 CSRF 검증을 생략한다는 뜻은 아닙니다.
-        // A07은 쿠키/세션 대신 명시적인 Bearer Access Token으로 인증합니다.
+        // A07~A09는 쿠키/세션 대신 명시적인 Bearer Access Token으로 인증합니다.
+        // 브라우저가 자동으로 붙이는 쿠키만으로는 인증할 수 없으므로 아래 지정된 요청만 CSRF를 제외합니다.
+        // CSRF 검사 제외는 인증 제외가 아닙니다. 공통 AccessTokenAuthenticationFilter의 검증은 그대로 필요합니다.
+        // 경로와 HTTP 메서드를 모두 한정하므로 로그인/재발급/로그아웃의 CSRF 검사는 유지됩니다.
         http.csrf(csrf -> csrf.csrfTokenRepository(new HttpSessionCsrfTokenRepository())
                         .ignoringRequestMatchers(paths.matcher(HttpMethod.PATCH, "/api/users/me"),
-                                paths.matcher(HttpMethod.PATCH, "/api/users/me/password")))
+                                paths.matcher(HttpMethod.PATCH, "/api/users/me/password"),
+                                // /api/auth 아래에 있지만 공개 API가 아닙니다. publicRequests에는 추가하지 않습니다.
+                                paths.matcher(HttpMethod.POST, "/api/auth/reauth")))
                 // CSRF 실패는 Controller 전에 발생하므로 공통 예외 처리기가 아닌 필터에서 JSON을 만듭니다.
                 .exceptionHandling(errors -> errors.accessDeniedHandler((request, response, exception) -> {
                     response.setStatus(403);

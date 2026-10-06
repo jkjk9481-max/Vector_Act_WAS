@@ -72,6 +72,9 @@ public class RefreshToken {
         replacedByTokenId = replacement.id;
     }
 
+    // 토큰의 행 자체를 삭제하지 않고 폐기 시각을 기록합니다. A08에서는 회원의 미폐기 토큰마다 호출합니다.
+    // 이미 폐기된 경우 최초 폐기 시각을 보존합니다. 여러 번 호출해도 과거 이력이 덮어써지지 않습니다.
+    // 교체 토큰 링크는 건드리지 않으며, DB 반영은 호출한 Service의 트랜잭션에서 이루어집니다.
     public void revoke(OffsetDateTime now) {
         if (revokedAt == null) revokedAt = now;
     }

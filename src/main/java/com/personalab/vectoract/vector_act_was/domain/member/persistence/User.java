@@ -21,6 +21,8 @@ import java.util.UUID;
 
 @Entity
 // 동시에 실행되는 이름 수정이 읽어 둔 이전 비밀번호 해시를 덮어쓰지 않게 합니다.
+// @DynamicUpdate는 실제로 바뀐 필드만 UPDATE SQL에 포함하게 합니다.
+// 예: A07이 이름만 바꾸면 password_hash를 SQL에 넣지 않아 A08의 새 해시를 보존합니다.
 @DynamicUpdate
 @Table(name = "users")
 @Getter
@@ -72,6 +74,8 @@ public class User {
         this.name = name;
     }
 
+    // 이미 Service에서 BCrypt로 변환한 해시만 전달받습니다. 평문을 넣는 메서드가 아닙니다.
+    // 이 시점에는 Java 객체의 값만 변경됩니다. 트랜잭션 안의 JPA 변경 감지가 DB UPDATE를 수행합니다.
     public void changePasswordHash(String encodedPassword) {
         this.passwordHash = encodedPassword;
     }
@@ -84,6 +88,9 @@ public class User {
         if (accountStatus == null) accountStatus = AccountStatus.ACTIVE;
     }
 
+    // JPA가 기존 행을 갱신하기 전에 호출하는 생명주기 콜백입니다.
+    // A08에서 passwordHash가 바뀌면 이 메서드가 수정 시각도 갱신합니다.
+    // 메서드를 직접 부르지 않아도 되지만, JPA를 우회한 직접 SQL에는 자동 적용되지 않습니다.
     @PreUpdate
     void onUpdate() {
         updatedAt = OffsetDateTime.now(ZoneOffset.UTC);

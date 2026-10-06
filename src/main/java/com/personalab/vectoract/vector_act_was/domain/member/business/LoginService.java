@@ -38,6 +38,8 @@ public class LoginService {
     @Transactional
     public Result login(String email, String password) {
         // 비밀번호 변경과 로그인 발급을 직렬화하여 이전 비밀번호로 새 토큰이 남지 않게 합니다.
+        // A08과 같은 사용자 행을 잠근 채 현재 저장된 해시를 확인하고 Refresh Token을 저장합니다.
+        // 잠금이 없으면 이전 해시로 로그인 검증을 끝낸 요청이 A08의 토큰 폐기 후 새 토큰을 만들 수 있습니다.
         User user = users.lockByEmail(email.strip().toLowerCase(Locale.ROOT)).orElse(null);
         // 입력 비밀번호를 자르거나 변환하지 않습니다. BCrypt 한도 초과는 인증 실패로 처리합니다.
         boolean matches = password != null && !password.isEmpty()
