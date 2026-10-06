@@ -29,6 +29,9 @@ public enum ErrorCode {
     CSRF_INVALID(HttpStatus.FORBIDDEN, "CSRF 토큰이 없거나 유효하지 않습니다."),
 
     // ========== Auth (인증/인가) ==========
+    AUTH_REQUIRED(HttpStatus.UNAUTHORIZED, "Access Token 인증이 필요합니다."),
+    ACCESS_EXPIRED(HttpStatus.UNAUTHORIZED, "만료된 Access Token입니다."),
+    ACCESS_INVALID(HttpStatus.UNAUTHORIZED, "유효하지 않은 Access Token입니다."),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "인증이 필요합니다."),
     REFRESH_INVALID(HttpStatus.UNAUTHORIZED, "유효하지 않은 Refresh Token입니다."),
     REFRESH_EXPIRED(HttpStatus.UNAUTHORIZED, "만료된 Refresh Token입니다."),

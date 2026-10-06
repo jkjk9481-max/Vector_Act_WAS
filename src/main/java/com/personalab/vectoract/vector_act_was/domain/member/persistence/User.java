@@ -65,6 +65,10 @@ public class User {
         return new User(email, passwordHash, name);
     }
 
+    public void changeName(String name) {
+        this.name = name;
+    }
+
     @PrePersist
     void onCreate() {
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);

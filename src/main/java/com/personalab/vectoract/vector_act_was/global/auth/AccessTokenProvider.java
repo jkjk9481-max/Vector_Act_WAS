@@ -14,6 +14,7 @@ import java.util.UUID;
 /** JWT 서명과 검증을 담당합니다. 토큰을 DB에 저장하지 않습니다. */
 @Component
 public class AccessTokenProvider {
+    public static final String EXPIRED_ERROR = "access_expired";
     public static final long EXPIRES_IN = 900;
     private final JwtEncoder encoder;
     private final NimbusJwtDecoder decoder;
@@ -37,7 +38,7 @@ public class AccessTokenProvider {
         // 서명뿐 아니라 만료 시각, 발급자, 용도, 회원 식별자도 확인합니다.
         // 만료 시각 이후에 추가 허용 시간을 두지 않습니다.
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                new JwtTimestampValidator(Duration.ZERO), new JwtIssuerValidator(issuer), this::validateClaims));
+                this::validateTimestamps, new JwtIssuerValidator(issuer), this::validateClaims));
     }
 
     public String issue(UUID userId) {
@@ -51,8 +52,20 @@ public class AccessTokenProvider {
     }
 
     public Jwt verify(String token) {
-        // 검증 실패는 JwtException입니다. A03에서는 검증 도구만 제공하고 인증 필터는 추가하지 않습니다.
+        // 서명 검증 후 claim을 검사합니다. 인증 필터는 검증 오류 코드로 만료와 다른 오류를 구분합니다.
         return decoder.decode(token);
+    }
+
+    private OAuth2TokenValidatorResult validateTimestamps(Jwt jwt) {
+        var result = new JwtTimestampValidator(Duration.ZERO).validate(jwt);
+        Instant now = Instant.now();
+        // 서명 검증을 통과한 JWT만 여기 도달합니다. 예외 메시지나 미검증 payload로 만료를 판단하지 않습니다.
+        // nbf(사용 가능 시작 시각)까지 잘못되었다면 단순 만료가 아니므로 기존 invalid_token을 유지합니다.
+        if (result.hasErrors() && jwt.getExpiresAt() != null && now.isAfter(jwt.getExpiresAt())
+                && (jwt.getNotBefore() == null || !now.isBefore(jwt.getNotBefore()))) {
+            return OAuth2TokenValidatorResult.failure(new OAuth2Error(EXPIRED_ERROR, "Access token expired", null));
+        }
+        return result;
     }
 
     private OAuth2TokenValidatorResult validateClaims(Jwt jwt) {
