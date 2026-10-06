@@ -36,7 +36,8 @@ public class SignupSecurityConfig {
         // permitAll은 로그인 전 접근을 허용한다는 뜻이며 CSRF 검증을 생략한다는 뜻은 아닙니다.
         // A07은 쿠키/세션 대신 명시적인 Bearer Access Token으로 인증합니다.
         http.csrf(csrf -> csrf.csrfTokenRepository(new HttpSessionCsrfTokenRepository())
-                        .ignoringRequestMatchers(paths.matcher(HttpMethod.PATCH, "/api/users/me")))
+                        .ignoringRequestMatchers(paths.matcher(HttpMethod.PATCH, "/api/users/me"),
+                                paths.matcher(HttpMethod.PATCH, "/api/users/me/password")))
                 // CSRF 실패는 Controller 전에 발생하므로 공통 예외 처리기가 아닌 필터에서 JSON을 만듭니다.
                 .exceptionHandling(errors -> errors.accessDeniedHandler((request, response, exception) -> {
                     response.setStatus(403);

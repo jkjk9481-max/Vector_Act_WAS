@@ -13,12 +13,15 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Entity
+// 동시에 실행되는 이름 수정이 읽어 둔 이전 비밀번호 해시를 덮어쓰지 않게 합니다.
+@DynamicUpdate
 @Table(name = "users")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -67,6 +70,10 @@ public class User {
 
     public void changeName(String name) {
         this.name = name;
+    }
+
+    public void changePasswordHash(String encodedPassword) {
+        this.passwordHash = encodedPassword;
     }
 
     @PrePersist

@@ -45,7 +45,7 @@ public class GlobalExceptionHandler {
                 .stream()
                 .map(error -> new ErrorResponse.FieldError(
                         error.getField(),
-                        "password".equals(error.getField()) ? "[REDACTED]" :
+                        error.getField().toLowerCase(java.util.Locale.ROOT).contains("password") ? "[REDACTED]" :
                                 error.getRejectedValue() == null ? "" : error.getRejectedValue().toString(),
                         error.getDefaultMessage()
                 ))

@@ -16,6 +16,11 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum ErrorCode {
 
+    PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "새 비밀번호와 확인 값이 일치하지 않습니다."),
+    CURRENT_PASSWORD_INVALID(HttpStatus.FORBIDDEN, "현재 비밀번호가 올바르지 않습니다."),
+    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),
+    DEPENDENCY_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "일시적으로 서비스를 이용할 수 없습니다."),
+
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "로그인 요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."),
 

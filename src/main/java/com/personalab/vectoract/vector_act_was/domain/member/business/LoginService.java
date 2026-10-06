@@ -37,7 +37,8 @@ public class LoginService {
     /** Controller → 비밀번호 검증 → 토큰 발급 → Repository 저장 순서입니다. */
     @Transactional
     public Result login(String email, String password) {
-        User user = users.findByEmail(email.strip().toLowerCase(Locale.ROOT)).orElse(null);
+        // 비밀번호 변경과 로그인 발급을 직렬화하여 이전 비밀번호로 새 토큰이 남지 않게 합니다.
+        User user = users.lockByEmail(email.strip().toLowerCase(Locale.ROOT)).orElse(null);
         // 입력 비밀번호를 자르거나 변환하지 않습니다. BCrypt 한도 초과는 인증 실패로 처리합니다.
         boolean matches = password != null && !password.isEmpty()
                 && password.getBytes(StandardCharsets.UTF_8).length <= 72

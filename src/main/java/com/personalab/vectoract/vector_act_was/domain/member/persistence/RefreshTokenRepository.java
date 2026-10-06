@@ -19,4 +19,6 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
     Optional<User> lockOwnerByTokenHash(@Param("hash") String hash);
 
     List<RefreshToken> findByFamilyIdAndRevokedAtIsNull(UUID familyId);
+
+    List<RefreshToken> findByUserIdAndRevokedAtIsNull(UUID userId);
 }
