@@ -28,14 +28,13 @@ class MemberPurgeServiceTests {
 
     @Test
     void failedMemberDoesNotStopOtherMembers() {
-        var users = mock(UserRepository.class);
         var service = mock(MemberPurgeService.class);
         var failed = UUID.randomUUID();
         var succeeded = UUID.randomUUID();
-        when(users.findPurgeCandidates(any())).thenReturn(List.of(failed, succeeded));
+        when(service.findDueUserIds()).thenReturn(List.of(failed, succeeded));
         when(service.purge(failed)).thenThrow(new IllegalStateException("failure"));
         when(service.purge(succeeded)).thenReturn(true);
-        new MemberPurgeScheduler(users, service).purgeDueUsers();
+        new MemberPurgeScheduler(service).purgeDueUsers();
         verify(service).purge(succeeded);
     }
 }

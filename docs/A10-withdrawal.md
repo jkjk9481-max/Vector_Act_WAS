@@ -1,8 +1,61 @@
 # A10 회원 탈퇴 — FR-AUTH-07
 
 회원 탈퇴는 두 단계입니다. 요청을 받은 날에는 계정 상태를 바꾸고 접근을 막습니다.
-7일이 지나면 스케줄러가 영상 저장소를 지운 뒤 DB 데이터를 지웁니다.
+7일이 지나면 스케줄러가 삭제를 시도합니다. 실제 저장소 삭제 구현체가 연결된 경우에만
+영상 저장소를 지운 뒤 DB 데이터를 지웁니다.
 commit/push 또는 운영 DB 변경은 이 구현에 포함하지 않습니다.
+
+## 현재 구현 상태
+
+말씀하신 흐름이 현재 코드와 일치합니다.
+
+| 단계 | 현재 동작 |
+| --- | --- |
+| 탈퇴 요청 | A09 검증 후 WITHDRAWN으로 변경 |
+| 즉시 접근 차단 | DB의 계정 상태를 조회하여 이후 보호 MVC 요청 거절 |
+| Refresh Token 폐기 | 모든 기기의 미폐기 토큰에 폐기 시각 기록 |
+| 7일 동안 보관 | 회원과 기존 DB 데이터를 삭제하지 않음 |
+| 7일 경과 후 | 정기 스케줄러가 삭제 대상으로 선택 |
+| 실제 영상·분석 삭제 | 구현체가 없어 아직 수행할 수 없음 |
+| 회원 Hard Delete | 삭제 구현체가 없으면 중단하고 DB 보존 |
+
+따라서 **현재는 7일이 되면 반드시 데이터가 사라지는 상태가 아닙니다.**
+연결 전에는 7일을 넘겨 계속 보관되며, 매 실행에서 실패 로그를 남깁니다.
+저장소 구현체를 연결하면 이미 예정 시각이 지난 회원도 다음 실행에서 다시 처리됩니다.
+
+## Controller → Service → Repository 역할
+
+| 계층 | 담당 | A10 예시 |
+| --- | --- | --- |
+| Controller | HTTP 입력과 출력 | 헤더 받기, 본문 검사, 202 응답과 쿠키 삭제 |
+| Service | 업무 규칙과 트랜잭션 | 토큰 확인, 탈퇴 상태 변경, 삭제 순서 결정 |
+| Repository | DB 조회·저장·삭제 | 회원 잠금 조회, 토큰 소비 UPDATE, 회원 DELETE |
+
+```text
+탈퇴 요청:
+WithdrawalController
+  → WithdrawalService
+    → UserRepository / AuthOneTimeTokenRepository / RefreshTokenRepository
+  ← 내부 Result를 WithdrawalResponse로 변환하여 202 응답
+
+회원 접근 검사 (Controller 실행 전):
+AccountStatusInterceptor
+  → AccountAccessService
+    → UserRepository
+
+시간에 의한 영구 삭제:
+MemberPurgeScheduler
+  → MemberPurgeService.findDueUserIds() → UserRepository
+  → 회원별 MemberPurgeService.purge()
+    → MemberDataEraser (현재 구현체 없음: 여기서 중단)
+    → 각 자식 Repository → UserRepository
+```
+
+스케줄러는 HTTP 요청이 아니라 시간에 의해 호출되므로 Controller를 거치지 않습니다.
+스케줄러가 Service를 직접 호출하는 것이 자연스럽고, Repository를 직접 호출하지 않도록 정리했습니다.
+접근 검사기도 HTTP 요청 종류만 구분하고, 계정 조회·접근 정책은 AccountAccessService에 위임합니다.
+외부 영상 저장소는 DB가 아니므로 MemberDataEraser라는 연결 계약을 통해 호출합니다.
+향후 그 구현체의 DB 삭제 부분은 영상·분석 모듈 Repository에 위임해야 합니다.
 
 ## 요청과 응답
 
@@ -34,8 +87,8 @@ commit/push 또는 운영 DB 변경은 이 구현에 포함하지 않습니다.
 
 1. `WithdrawalController`: HTTP 헤더를 받고 본문 유무와 요청 횟수를 검사합니다.
 2. `WithdrawalService`: 회원 행을 잠그고 재인증 토큰 검증 → Soft Delete → 토큰 폐기를 수행합니다.
-3. `AccountStatusInterceptor`: 보호 MVC 요청마다 회원 상태를 조회해 기존 JWT 접근도 차단합니다.
-4. `MemberPurgeScheduler`: 보관 기간이 지난 회원 ID를 조회하고 한 명씩 삭제를 요청합니다.
+3. `AccountStatusInterceptor → AccountAccessService`: 보호 MVC 요청마다 회원 상태를 확인합니다.
+4. `MemberPurgeScheduler`: Service에 삭제 대상 조회와 회원별 삭제를 요청합니다.
 5. `MemberPurgeService`: 외부 저장소 → 추가 DB 데이터 → 토큰·동의 → 회원 순서로 삭제합니다.
 6. `MemberDataEraser`: 영상 저장소와 영상·분석 테이블 삭제를 실제 모듈에 연결할 계약입니다.
 

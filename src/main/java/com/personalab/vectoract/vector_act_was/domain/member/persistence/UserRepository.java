@@ -31,6 +31,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByEmail(String email);
 
+    // A10 Hard Delete 대상 조회입니다. Repository는 전달받은 조건으로 조회만 하고 삭제 여부를 결정하지 않습니다.
+    // WITHDRAWN이면서 purge_at <= 현재 시각인 회원만 반환합니다. purge_at이 null인 회원은 포함되지 않습니다.
+    // 전체 엔티티 대신 ID만 가져오며, Service가 각 ID를 잠근 뒤 상태와 예정 시각을 다시 확인합니다.
+    // :now는 @Param으로 전달한 UTC 시각입니다. 예정 시각과 같아도 삭제 대상으로 포함합니다.
     @Query("select u.id from User u where u.accountStatus = 'WITHDRAWN' and u.purgeAt <= :now order by u.purgeAt, u.id")
     java.util.List<UUID> findPurgeCandidates(@Param("now") java.time.OffsetDateTime now);
 
