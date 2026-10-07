@@ -12,4 +12,4 @@ CREATE TABLE auth_one_time_tokens (
 CREATE INDEX idx_auth_one_time_tokens_user_id ON auth_one_time_tokens(user_id);
 CREATE INDEX idx_auth_one_time_tokens_expires_at ON auth_one_time_tokens(expires_at);
 -- REAUTH는 생성 시각 + 5분으로 애플리케이션이 만료 시각을 설정합니다.
--- PASSWORD_RESET은 문서상 15분이며, 해당 발급 API를 구현할 때 적용합니다.
+-- A11의 PASSWORD_RESET은 생성 시각 + 15분으로 애플리케이션이 만료 시각을 설정합니다.

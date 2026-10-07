@@ -28,6 +28,8 @@ public class SignupSecurityConfig {
                 paths.matcher(HttpMethod.GET, "/api/auth/csrf"),
                 paths.matcher(HttpMethod.POST, "/api/auth/signup"),
                 paths.matcher(HttpMethod.POST, "/api/auth/login"),
+                // 비밀번호를 잊은 비로그인 사용자용입니다. Bearer 없이 허용하되 CSRF 검사는 유지합니다.
+                paths.matcher(HttpMethod.POST, "/api/auth/password-reset-requests"),
                 paths.matcher(HttpMethod.POST, "/api/auth/refresh"),
                 paths.matcher(HttpMethod.POST, "/api/auth/logout"));
         // SecurityFilterChain은 Controller에 도달하기 전에 요청의 보안 조건을 검사합니다.

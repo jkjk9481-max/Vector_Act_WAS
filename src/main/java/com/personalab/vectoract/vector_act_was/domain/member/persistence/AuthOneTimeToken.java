@@ -13,7 +13,7 @@ import java.util.UUID;
 /**
  * 비밀번호 재설정과 탈퇴 재인증에 사용하는 일회성 토큰의 DB 표현입니다.
  * 원문 토큰은 이 객체에 보관하지 않습니다. 유출 피해를 줄이기 위해 해시만 저장합니다.
- * A09는 REAUTH만 발급하며 PASSWORD_RESET 발급 API는 여기서 구현하지 않습니다.
+ * A09는 REAUTH(5분), A11은 PASSWORD_RESET(15분)을 발급합니다.
  */
 @Entity
 @Table(name = "auth_one_time_tokens", indexes = {
@@ -63,6 +63,18 @@ public class AuthOneTimeToken {
         token.tokenHash = tokenHash;
         token.createdAt = now;
         token.expiresAt = now.plusMinutes(5);
+        return token;
+    }
+
+    /** A11 전용 생성: 비밀번호를 바꾸거나 사용 처리하지 않고 15분 유효한 토큰을 만듭니다. */
+    public static AuthOneTimeToken createPasswordReset(User user, String tokenHash, OffsetDateTime now) {
+        var token = new AuthOneTimeToken();
+        token.user = user;
+        token.tokenType = TokenType.PASSWORD_RESET;
+        token.tokenHash = tokenHash;
+        token.createdAt = now;
+        token.expiresAt = now.plusMinutes(15);
+        // usedAt은 null(미사용)입니다. 실제 사용 검증과 소비는 향후 A12의 책임입니다.
         return token;
     }
 

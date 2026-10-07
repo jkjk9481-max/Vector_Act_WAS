@@ -30,6 +30,11 @@ server:
         same-site: lax
 
 auth:
+  password-reset-rate-limit:
+    # 가입 여부와 무관하게 동일 적용합니다. 단일 서버 메모리 기준 15분 동안 IP 10회, 이메일 3회입니다.
+    ip-max-attempts: ${PASSWORD_RESET_IP_MAX_ATTEMPTS:10}
+    email-max-attempts: ${PASSWORD_RESET_EMAIL_MAX_ATTEMPTS:3}
+    window-seconds: ${PASSWORD_RESET_WINDOW_SECONDS:900}
   withdrawal:
     # 삭제 저장소 구현체가 없으면 실패 로그를 남기고 DB를 보존합니다.
     purge-enabled: ${WITHDRAWAL_PURGE_ENABLED:true}
