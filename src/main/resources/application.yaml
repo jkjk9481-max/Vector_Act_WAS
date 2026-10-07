@@ -24,6 +24,8 @@ signup:
 server:
   servlet:
     session:
+      # CSRF 저장 세션이 기본 30분 유휴 만료로 토큰보다 먼저 사라지지 않도록 기본값을 맞춥니다.
+      timeout: ${CSRF_SESSION_TIMEOUT:24h}
       cookie:
         http-only: true
         secure: ${CSRF_SESSION_COOKIE_SECURE:true}
@@ -32,7 +34,11 @@ server:
 auth:
   csrf:
     # 토큰 자체의 고정 유효 기간입니다. 세션이 먼저 종료되면 이 시각 전에도 재발급해야 합니다.
-    ttl-seconds: ${CSRF_TTL_SECONDS:1800}
+    ttl-seconds: ${CSRF_TTL_SECONDS:86400}
+  csrf-rate-limit:
+    # A01 GET 발급 요청 전용 제한입니다. 횟수 기준은 설정으로 조정할 수 있습니다.
+    max-attempts: ${CSRF_RATE_LIMIT_MAX_ATTEMPTS:60}
+    window-seconds: ${CSRF_RATE_LIMIT_WINDOW_SECONDS:60}
   password-reset-rate-limit:
     # 가입 여부와 무관하게 동일 적용합니다. 단일 서버 메모리 기준 15분 동안 IP 10회, 이메일 3회입니다.
     ip-max-attempts: ${PASSWORD_RESET_IP_MAX_ATTEMPTS:10}

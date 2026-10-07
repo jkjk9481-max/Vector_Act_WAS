@@ -11,10 +11,12 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class LoginWebConfig implements WebMvcConfigurer {
     private final LoginRateLimiter limiter;
     private final com.personalab.vectoract.vector_act_was.global.auth.AccountStatusInterceptor accountStatus;
+    private final com.personalab.vectoract.vector_act_was.global.auth.CsrfRateLimitInterceptor csrfRateLimit;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(accountStatus).addPathPatterns("/**");
+        registry.addInterceptor(csrfRateLimit).addPathPatterns("/api/auth/csrf");
         // 회원가입/다른 API의 동작을 바꾸지 않고 로그인 요청만 제한합니다.
         registry.addInterceptor(limiter).addPathPatterns("/api/auth/login");
     }

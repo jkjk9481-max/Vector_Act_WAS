@@ -21,11 +21,11 @@ public class ExpiringCsrfTokenRepository implements CsrfTokenRepository {
     private final Clock clock;
 
     @Autowired
-    public ExpiringCsrfTokenRepository(@Value("${auth.csrf.ttl-seconds:1800}") long seconds) {
+    public ExpiringCsrfTokenRepository(@Value("${auth.csrf.ttl-seconds:86400}") long seconds) {
         this(seconds, Clock.systemUTC());
     }
 
-    // 테스트는 Clock을 고정하여 실제로 30분 기다리지 않고 만료 경계를 확인합니다.
+    // 테스트는 Clock을 고정하여 실제로 24시간 기다리지 않고 만료 경계를 확인합니다.
     public ExpiringCsrfTokenRepository(long seconds, Clock clock) {
         if (seconds <= 0) throw new IllegalArgumentException("CSRF lifetime must be positive");
         this.lifetime = Duration.ofSeconds(seconds);
