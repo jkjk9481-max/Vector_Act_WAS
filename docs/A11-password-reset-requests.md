@@ -8,7 +8,7 @@ A11은 비밀번호를 잊은 사용자의 요청을 받고 **재설정용 토�
 `POST /api/auth/password-reset-requests`
 
 1. 먼저 A01 `GET /api/auth/csrf`를 호출합니다.
-2. A01에서 받은 세션 쿠키를 유지하고, 응답의 `headerName`에 해당하는 헤더에 `token`을 넣습니다.
+2. A01에서 받은 세션 쿠키를 유지하고, `X-CSRF-TOKEN` 헤더에 응답의 `csrfToken`을 넣습니다. `expiresAt`이 지났으면 A01에서 다시 발급받습니다.
 3. 아래 JSON을 전송합니다. Bearer 인증은 필요하지 않습니다.
 
 ```json

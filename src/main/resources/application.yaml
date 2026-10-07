@@ -30,6 +30,9 @@ server:
         same-site: lax
 
 auth:
+  csrf:
+    # 토큰 자체의 고정 유효 기간입니다. 세션이 먼저 종료되면 이 시각 전에도 재발급해야 합니다.
+    ttl-seconds: ${CSRF_TTL_SECONDS:1800}
   password-reset-rate-limit:
     # 가입 여부와 무관하게 동일 적용합니다. 단일 서버 메모리 기준 15분 동안 IP 10회, 이메일 3회입니다.
     ip-max-attempts: ${PASSWORD_RESET_IP_MAX_ATTEMPTS:10}

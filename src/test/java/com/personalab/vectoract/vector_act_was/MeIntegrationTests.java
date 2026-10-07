@@ -147,8 +147,13 @@ class MeIntegrationTests {
             "POST,/api/auth/refresh,401", "POST,/api/auth/logout,200"})
     void publicApisKeepTheirOwnBehaviorWithInvalidAccessHeader(String method, String path, int expectedStatus) throws Exception {
         // 공개 API는 잘못된 Access Token 때문에 차단되면 안 됩니다. 기존 입력/Refresh 검증까지 진행해야 합니다.
-        var response = mvc.perform(request(org.springframework.http.HttpMethod.valueOf(method), path)
-                        .with(csrf()).header("Authorization", "Bearer invalid"))
+        var builder = request(org.springframework.http.HttpMethod.valueOf(method), path);
+        if ("GET".equals(method)) {
+            builder.with(com.personalab.vectoract.vector_act_was.support.ApplicationCsrf.applicationCsrf());
+        } else {
+            builder.with(csrf());
+        }
+        var response = mvc.perform(builder.header("Authorization", "Bearer invalid"))
                 .andExpect(status().is(expectedStatus)).andReturn().getResponse().getContentAsString();
         assertThat(response).doesNotContain("AUTH_REQUIRED", "ACCESS_INVALID", "ACCESS_EXPIRED");
     }

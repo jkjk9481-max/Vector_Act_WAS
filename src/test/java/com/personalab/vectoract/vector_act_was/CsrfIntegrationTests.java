@@ -23,6 +23,7 @@ class CsrfIntegrationTests {
     @Autowired UserRepository users;
     @Autowired UserConsentRepository consents;
     @Autowired RefreshTokenRepository refreshTokens;
+    @Autowired com.personalab.vectoract.vector_act_was.global.auth.ExpiringCsrfTokenRepository csrfTokens;
     private static final String SIGNUP = """
             {"name":"배우","email":"actor@example.com","password":"password12345",
              "termsVersion":"test-v1","privacyVersion":"test-v1","termsAccepted":true,"privacyAccepted":true}
@@ -91,18 +92,54 @@ class CsrfIntegrationTests {
                 .andExpect(status().isCreated());
     }
 
+    @Test
+    void finalContractReturnsStoredExpiryWithoutExtendingOnRepeatedGet() throws Exception {
+        var first = mvc.perform(get("/api/auth/csrf").with(com.personalab.vectoract.vector_act_was.support.ApplicationCsrf.applicationCsrf())).andExpect(status().isOk()).andReturn();
+        var session = (MockHttpSession) first.getRequest().getSession(false);
+        java.util.Map<String, Object> data = JsonPath.read(first.getResponse().getContentAsString(), "$.data");
+        assertThat(data).containsOnlyKeys("csrfToken", "expiresAt");
+        var expiry = java.time.OffsetDateTime.parse((String) data.get("expiresAt"));
+        assertThat(expiry).isEqualTo(csrfTokens.getExpiresAt(first.getRequest()));
+        assertThat(expiry.isAfter(java.time.OffsetDateTime.now())).isTrue();
+        mvc.perform(get("/api/auth/csrf").with(com.personalab.vectoract.vector_act_was.support.ApplicationCsrf.applicationCsrf()).session(session)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.expiresAt").value(data.get("expiresAt")));
+    }
+
+    @Test
+    void expiredTokenIsRejectedAndA01RenewalWorksInSameSession() throws Exception {
+        var old = issue();
+        var request = new org.springframework.mock.web.MockHttpServletRequest();
+        request.setSession(old.session());
+        var token = csrfTokens.loadToken(request);
+        // 운영과 같은 저장 구조에 이미 만료된 발급 시각을 넣어 기다림 없이 만료를 재현합니다.
+        var past = java.time.Clock.fixed(java.time.Instant.now().minusSeconds(60), java.time.ZoneOffset.UTC);
+        new com.personalab.vectoract.vector_act_was.global.auth.ExpiringCsrfTokenRepository(1, past)
+                .saveToken(token, request, new org.springframework.mock.web.MockHttpServletResponse());
+        mvc.perform(post("/api/auth/signup").session(old.session()).header(old.header(), old.token())
+                        .contentType(MediaType.APPLICATION_JSON).content(SIGNUP))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.error.code").value("CSRF_INVALID"));
+        assertThat(users.count()).isZero();
+        var renewed = mvc.perform(get("/api/auth/csrf").session(old.session())).andExpect(status().isOk()).andReturn();
+        String renewedToken = JsonPath.read(renewed.getResponse().getContentAsString(), "$.data.csrfToken");
+        assertThat(renewedToken).isNotEqualTo(old.token());
+        mvc.perform(post("/api/auth/signup").session(old.session()).header("X-CSRF-TOKEN", renewedToken)
+                        .contentType(MediaType.APPLICATION_JSON).content(SIGNUP))
+                .andExpect(status().isCreated());
+    }
+
     private Issued issue() throws Exception {
-        var result = mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk())
+        var result = mvc.perform(get("/api/auth/csrf").with(com.personalab.vectoract.vector_act_was.support.ApplicationCsrf.applicationCsrf())).andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.token").isNotEmpty())
-                .andExpect(jsonPath("$.data.token").isString())
-                .andExpect(jsonPath("$.data.headerName").value("X-CSRF-TOKEN"))
-                .andExpect(jsonPath("$.data.expiresAt").doesNotExist())
+                .andExpect(jsonPath("$.data.csrfToken").isNotEmpty())
+                .andExpect(jsonPath("$.data.csrfToken").isString())
+                .andExpect(jsonPath("$.data.headerName").doesNotExist())
+                .andExpect(jsonPath("$.data.token").doesNotExist())
+                .andExpect(jsonPath("$.data.expiresAt").isString())
                 .andExpect(header().string("Cache-Control", "no-store")).andReturn();
         var session = (MockHttpSession) result.getRequest().getSession(false);
         assertThat(session).isNotNull();
-        return new Issued(session, JsonPath.read(result.getResponse().getContentAsString(), "$.data.token"),
-                JsonPath.read(result.getResponse().getContentAsString(), "$.data.headerName"));
+        return new Issued(session, JsonPath.read(result.getResponse().getContentAsString(), "$.data.csrfToken"),
+                "X-CSRF-TOKEN");
     }
 
     private record Issued(MockHttpSession session, String token, String header) { }

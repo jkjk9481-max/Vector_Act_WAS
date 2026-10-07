@@ -127,8 +127,8 @@ class PasswordResetRequestIntegrationTests {
 
     @Test
     void requiresRealA01CsrfTokenAndMatchingSession() throws Exception {
-        var issued = mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk()).andReturn();
-        String csrfToken = JsonPath.read(issued.getResponse().getContentAsString(), "$.data.token");
+        var issued = mvc.perform(get("/api/auth/csrf").with(com.personalab.vectoract.vector_act_was.support.ApplicationCsrf.applicationCsrf())).andExpect(status().isOk()).andReturn();
+        String csrfToken = JsonPath.read(issued.getResponse().getContentAsString(), "$.data.csrfToken");
         var session = (MockHttpSession) issued.getRequest().getSession(false);
         for (var request : List.of(post(PATH), post(PATH).session(session),
                 post(PATH).session(session).header("X-CSRF-TOKEN", "wrong"),

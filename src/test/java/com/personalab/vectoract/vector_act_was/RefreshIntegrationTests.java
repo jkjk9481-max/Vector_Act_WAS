@@ -48,8 +48,8 @@ class RefreshIntegrationTests {
 
     @Test
     void refreshWithA01SessionIssuesJwtAndRotatesCookieAndDatabase() throws Exception {
-        var csrfResult = mvc.perform(get("/api/auth/csrf")).andExpect(status().isOk()).andReturn();
-        String csrfToken = JsonPath.read(csrfResult.getResponse().getContentAsString(), "$.data.token");
+        var csrfResult = mvc.perform(get("/api/auth/csrf").with(com.personalab.vectoract.vector_act_was.support.ApplicationCsrf.applicationCsrf())).andExpect(status().isOk()).andReturn();
+        String csrfToken = JsonPath.read(csrfResult.getResponse().getContentAsString(), "$.data.csrfToken");
         String oldAccess = accessTokens.issue(user.getId());
         var response = mvc.perform(post("/api/auth/refresh")
                         .session((MockHttpSession) csrfResult.getRequest().getSession(false))

@@ -5,7 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import com.personalab.vectoract.vector_act_was.global.auth.ExpiringCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfException;
 import com.personalab.vectoract.vector_act_was.global.common.response.ErrorResponse;
 import com.personalab.vectoract.vector_act_was.global.error.ErrorCode;
@@ -21,7 +21,8 @@ import org.springframework.security.web.authentication.AnonymousAuthenticationFi
 public class SignupSecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper objectMapper,
-                                             AccessTokenProvider accessTokenProvider) throws Exception {
+                                             AccessTokenProvider accessTokenProvider,
+                                             ExpiringCsrfTokenRepository csrfTokens) throws Exception {
         // 기존 공개 API 목록을 접근 허용 설정과 인증 필터가 함께 사용합니다.
         var paths = PathPatternRequestMatcher.withDefaults();
         var publicRequests = new OrRequestMatcher(
@@ -40,7 +41,7 @@ public class SignupSecurityConfig {
         // 브라우저가 자동으로 붙이는 쿠키만으로는 인증할 수 없으므로 아래 지정된 요청만 CSRF를 제외합니다.
         // CSRF 검사 제외는 인증 제외가 아닙니다. 공통 AccessTokenAuthenticationFilter의 검증은 그대로 필요합니다.
         // 경로와 HTTP 메서드를 모두 한정하므로 로그인/재발급/로그아웃의 CSRF 검사는 유지됩니다.
-        http.csrf(csrf -> csrf.csrfTokenRepository(new HttpSessionCsrfTokenRepository())
+        http.csrf(csrf -> csrf.csrfTokenRepository(csrfTokens)
                         .ignoringRequestMatchers(paths.matcher(HttpMethod.DELETE, "/api/users/me"),
                                 paths.matcher(HttpMethod.PATCH, "/api/users/me"),
                                 paths.matcher(HttpMethod.PATCH, "/api/users/me/password"),
