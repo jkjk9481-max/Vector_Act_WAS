@@ -31,5 +31,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByEmail(String email);
 
+    @Query("select u.id from User u where u.accountStatus = 'WITHDRAWN' and u.purgeAt <= :now order by u.purgeAt, u.id")
+    java.util.List<UUID> findPurgeCandidates(@Param("now") java.time.OffsetDateTime now);
+
     boolean existsByEmail(String email);
 }

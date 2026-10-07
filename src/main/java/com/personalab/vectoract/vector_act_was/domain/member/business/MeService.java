@@ -39,7 +39,7 @@ public class MeService {
     // 관리 중인 엔티티의 변경 감지로 저장되며 @PreUpdate가 updated_at을 갱신합니다.
     @Transactional
     public Result updateMe(UUID userId, String name) {
-        var user = users.findById(userId)
+        var user = users.lockById(userId)
                 .filter(found -> found.getAccountStatus() == User.AccountStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         user.changeName(name);

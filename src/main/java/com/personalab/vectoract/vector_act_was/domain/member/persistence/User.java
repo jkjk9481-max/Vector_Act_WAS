@@ -70,6 +70,13 @@ public class User {
         return new User(email, passwordHash, name);
     }
 
+    // 탈퇴는 즉시 삭제가 아닙니다. 같은 기준 시각으로 보관 기간을 정확히 7일로 정합니다.
+    public void withdraw(OffsetDateTime now) {
+        this.accountStatus = AccountStatus.WITHDRAWN;
+        this.deletedAt = now;
+        this.purgeAt = now.plusDays(7);
+    }
+
     public void changeName(String name) {
         this.name = name;
     }

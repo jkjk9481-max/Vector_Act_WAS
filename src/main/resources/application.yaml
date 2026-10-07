@@ -30,6 +30,14 @@ server:
         same-site: lax
 
 auth:
+  withdrawal:
+    # 삭제 저장소 구현체가 없으면 실패 로그를 남기고 DB를 보존합니다.
+    purge-enabled: ${WITHDRAWAL_PURGE_ENABLED:true}
+    purge-delay-ms: ${WITHDRAWAL_PURGE_DELAY_MS:3600000}
+    purge-initial-delay-ms: ${WITHDRAWAL_PURGE_INITIAL_DELAY_MS:60000}
+  withdrawal-rate-limit:
+    max-attempts: ${WITHDRAWAL_RATE_LIMIT_MAX_ATTEMPTS:10}
+    window-seconds: ${WITHDRAWAL_RATE_LIMIT_WINDOW_SECONDS:60}
   jwt:
     # 최소 32바이트의 무작위 키를 Base64로 인코딩해 환경변수로 전달합니다. 기본 비밀키는 없습니다.
     secret-base64: ${JWT_SECRET_BASE64}

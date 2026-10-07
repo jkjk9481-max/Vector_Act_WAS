@@ -16,6 +16,8 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum ErrorCode {
 
+    REAUTH_REQUIRED(HttpStatus.FORBIDDEN, "유효한 재인증 토큰이 필요합니다."),
+    ACCOUNT_DELETED(HttpStatus.CONFLICT, "이미 탈퇴한 계정입니다."),
     PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "새 비밀번호와 확인 값이 일치하지 않습니다."),
     CURRENT_PASSWORD_INVALID(HttpStatus.FORBIDDEN, "현재 비밀번호가 올바르지 않습니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),

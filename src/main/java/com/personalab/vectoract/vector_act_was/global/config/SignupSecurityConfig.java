@@ -39,7 +39,8 @@ public class SignupSecurityConfig {
         // CSRF 검사 제외는 인증 제외가 아닙니다. 공통 AccessTokenAuthenticationFilter의 검증은 그대로 필요합니다.
         // 경로와 HTTP 메서드를 모두 한정하므로 로그인/재발급/로그아웃의 CSRF 검사는 유지됩니다.
         http.csrf(csrf -> csrf.csrfTokenRepository(new HttpSessionCsrfTokenRepository())
-                        .ignoringRequestMatchers(paths.matcher(HttpMethod.PATCH, "/api/users/me"),
+                        .ignoringRequestMatchers(paths.matcher(HttpMethod.DELETE, "/api/users/me"),
+                                paths.matcher(HttpMethod.PATCH, "/api/users/me"),
                                 paths.matcher(HttpMethod.PATCH, "/api/users/me/password"),
                                 // /api/auth 아래에 있지만 공개 API가 아닙니다. publicRequests에는 추가하지 않습니다.
                                 paths.matcher(HttpMethod.POST, "/api/auth/reauth")))

@@ -11,6 +11,11 @@ import java.util.UUID;
 // Spring Data JPA가 이 인터페이스의 DB 접근 구현체를 만듭니다.
 // <AuthOneTimeToken, UUID>는 관리할 엔티티와 그 기본 키의 타입입니다.
 public interface AuthOneTimeTokenRepository extends JpaRepository<AuthOneTimeToken, UUID> {
+    // 다른 재인증/비밀번호 재설정 토큰도 탈퇴와 함께 사용 불가로 만듭니다.
+    @Modifying(flushAutomatically = true)
+    @Query("update AuthOneTimeToken t set t.usedAt = :now where t.user.id = :userId and t.usedAt is null")
+    int invalidateAll(@Param("userId") UUID userId, @Param("now") OffsetDateTime now);
+
     Optional<AuthOneTimeToken> findByTokenHash(String tokenHash);
 
     /**
@@ -31,4 +36,6 @@ public interface AuthOneTimeTokenRepository extends JpaRepository<AuthOneTimeTok
             """)
     int consumeIfUsable(@Param("hash") String hash, @Param("userId") UUID userId,
                         @Param("tokenType") AuthOneTimeToken.TokenType tokenType, @Param("now") OffsetDateTime now);
+    // Hard Delete에서 부모 users 행보다 먼저 자식 데이터를 제거합니다.
+    void deleteByUserId(UUID userId);
 }

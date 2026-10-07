@@ -27,4 +27,6 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
     // 이 메서드는 조회만 하며, Service가 각 엔티티에 revoke()를 호출해야 실제 변경이 생깁니다.
     // 사용자 행 잠금과 같은 Service 트랜잭션에 참여하므로 여기에 별도 @Transactional을 붙이지 않습니다.
     List<RefreshToken> findByUserIdAndRevokedAtIsNull(UUID userId);
+    // Hard Delete에서 부모 users 행보다 먼저 자식 데이터를 제거합니다.
+    void deleteByUserId(UUID userId);
 }

@@ -8,4 +8,6 @@ import java.util.UUID;
 public interface UserConsentRepository extends JpaRepository<UserConsent, UUID> {
 
     List<UserConsent> findAllByUserId(UUID userId);
+    // Hard Delete에서 부모 users 행보다 먼저 자식 데이터를 제거합니다.
+    void deleteByUserId(UUID userId);
 }
