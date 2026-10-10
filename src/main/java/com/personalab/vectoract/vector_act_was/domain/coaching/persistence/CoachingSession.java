@@ -172,6 +172,17 @@ public class CoachingSession {
         this.updatedAt = now;
     }
 
+    /**
+     * C11: 재분석이 접수됐을 때 세션의 분석 상태를 대기(QUEUED)로 돌리고 시도 횟수를 맞춥니다.
+     * 세션 상태(status)와 영상 상태는 그대로 둡니다.
+     */
+    public void queueAnalysisRetry(int attempt, OffsetDateTime now) {
+        this.analysisStatus = AnalysisStatus.QUEUED;
+        this.analysisAttempt = attempt;
+        this.failureCode = null;
+        this.updatedAt = now;
+    }
+
     /** 이미 접수된 종료 선언과 같은 내용인지 확인합니다. */
     public boolean sameFinishManifest(int lastChunkIndex, int durationMs) {
         return declaredLastChunkIndex != null && declaredLastChunkIndex == lastChunkIndex
