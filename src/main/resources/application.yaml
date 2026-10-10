@@ -1,6 +1,11 @@
 spring:
   application:
     name: Vector_Act_WAS
+  servlet:
+    multipart:
+      # 컨테이너 상한은 명세에서 가장 큰 업로드(S01 10MiB)에 맞추고, API별 한도는 각 Controller가 검사합니다.
+      max-file-size: 10MB
+      max-request-size: 11MB
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/vector_act}
     username: ${DB_USERNAME:postgres}
@@ -44,6 +49,15 @@ auth:
     ip-max-attempts: ${PASSWORD_RESET_IP_MAX_ATTEMPTS:10}
     email-max-attempts: ${PASSWORD_RESET_EMAIL_MAX_ATTEMPTS:3}
     window-seconds: ${PASSWORD_RESET_WINDOW_SECONDS:900}
+  email-change-rate-limit:
+    max-attempts: ${EMAIL_CHANGE_MAX_ATTEMPTS:10}
+    window-seconds: ${EMAIL_CHANGE_WINDOW_SECONDS:900}
+  email-change-completion-rate-limit:
+    max-attempts: ${EMAIL_CHANGE_COMPLETION_MAX_ATTEMPTS:10}
+    window-seconds: ${EMAIL_CHANGE_COMPLETION_WINDOW_SECONDS:60}
+  profile-image-rate-limit:
+    max-attempts: ${PROFILE_IMAGE_RATE_LIMIT_MAX_ATTEMPTS:10}
+    window-seconds: ${PROFILE_IMAGE_RATE_LIMIT_WINDOW_SECONDS:60}
   withdrawal:
     # 삭제 저장소 구현체가 없으면 실패 로그를 남기고 DB를 보존합니다.
     purge-enabled: ${WITHDRAWAL_PURGE_ENABLED:true}

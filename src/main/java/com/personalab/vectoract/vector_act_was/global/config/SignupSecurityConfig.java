@@ -31,6 +31,9 @@ public class SignupSecurityConfig {
                 paths.matcher(HttpMethod.POST, "/api/auth/login"),
                 // 비밀번호를 잊은 비로그인 사용자용입니다. Bearer 없이 허용하되 CSRF 검사는 유지합니다.
                 paths.matcher(HttpMethod.POST, "/api/auth/password-reset-requests"),
+                paths.matcher(HttpMethod.POST, "/api/auth/password-resets"),
+                // 이메일 인증 링크는 비로그인 브라우저에서도 열 수 있어 Bearer 없이 CSRF만 요구합니다.
+                paths.matcher(HttpMethod.POST, "/api/users/me/email-changes"),
                 paths.matcher(HttpMethod.POST, "/api/auth/refresh"),
                 paths.matcher(HttpMethod.POST, "/api/auth/logout"));
         // SecurityFilterChain은 Controller에 도달하기 전에 요청의 보안 조건을 검사합니다.
@@ -45,6 +48,9 @@ public class SignupSecurityConfig {
                         .ignoringRequestMatchers(paths.matcher(HttpMethod.DELETE, "/api/users/me"),
                                 paths.matcher(HttpMethod.PATCH, "/api/users/me"),
                                 paths.matcher(HttpMethod.PATCH, "/api/users/me/password"),
+                                paths.matcher(HttpMethod.POST, "/api/users/me/email-change-requests"),
+                                paths.matcher(HttpMethod.PUT, "/api/users/me/profile-image"),
+                                paths.matcher(HttpMethod.DELETE, "/api/users/me/profile-image"),
                                 // /api/auth 아래에 있지만 공개 API가 아닙니다. publicRequests에는 추가하지 않습니다.
                                 paths.matcher(HttpMethod.POST, "/api/auth/reauth")))
                 // CSRF 실패는 Controller 전에 발생하므로 공통 예외 처리기가 아닌 필터에서 JSON을 만듭니다.

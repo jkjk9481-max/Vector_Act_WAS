@@ -58,6 +58,13 @@ public class User {
     @Column(name = "purge_at", columnDefinition = "TIMESTAMPTZ")
     private OffsetDateTime purgeAt;
 
+    // S3 object key입니다. 이미지가 없으면 null이며 URL 자체는 저장하지 않습니다.
+    @Column(name = "profile_image_key", length = 700, unique = true)
+    private String profileImageKey;
+
+    @Column(name = "profile_image_updated_at", columnDefinition = "TIMESTAMPTZ")
+    private OffsetDateTime profileImageUpdatedAt;
+
     private User(String email, String passwordHash, String name) {
         this.email = email;
         this.passwordHash = passwordHash;
@@ -75,6 +82,21 @@ public class User {
         this.accountStatus = AccountStatus.WITHDRAWN;
         this.deletedAt = now;
         this.purgeAt = now.plusDays(7);
+    }
+
+    // 이미 정규화·중복 검사를 마친 주소만 전달받습니다. 인증 링크(A14) 완료 시에만 호출합니다.
+    public void changeEmail(String email) {
+        this.email = email;
+    }
+
+    public void changeProfileImage(String key, OffsetDateTime now) {
+        this.profileImageKey = key;
+        this.profileImageUpdatedAt = now;
+    }
+
+    public void clearProfileImage(OffsetDateTime now) {
+        this.profileImageKey = null;
+        this.profileImageUpdatedAt = now;
     }
 
     public void changeName(String name) {

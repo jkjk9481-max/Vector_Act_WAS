@@ -35,7 +35,8 @@ public class MeController {
     public ResponseEntity<ApiResponse<MeResponse>> updateMe(
             @AuthenticationPrincipal UUID userId, @Valid @RequestBody UpdateMeRequest request) {
         var result = service.updateMe(userId, request.name());
-        var response = new MeResponse(result.userId(), result.name(), result.email(), result.createdAt());
+        var response = new MeResponse(result.userId(), result.name(), result.email(),
+                result.createdAt(), result.profileImageUrl());
         return ResponseEntity.ok().header("Cache-Control", "no-store")
                 .body(ApiResponse.ok(response));
     }
@@ -47,7 +48,8 @@ public class MeController {
     public ResponseEntity<ApiResponse<MeResponse>> me(@AuthenticationPrincipal UUID userId) {
         // HTTP 응답 형식으로 변환하는 책임은 presentation 계층인 컨트롤러에 둡니다.
         var result = service.getMe(userId);
-        var response = new MeResponse(result.userId(), result.name(), result.email(), result.createdAt());
+        var response = new MeResponse(result.userId(), result.name(), result.email(),
+                result.createdAt(), result.profileImageUrl());
         // ApiResponse.ok가 success/data/message/error로 감쌉니다.
         // ResponseEntity.ok는 HTTP 200을 지정하고, no-store는 개인정보 응답을 캐시에 저장하지 말라는 뜻입니다.
         return ResponseEntity.ok().header("Cache-Control", "no-store")

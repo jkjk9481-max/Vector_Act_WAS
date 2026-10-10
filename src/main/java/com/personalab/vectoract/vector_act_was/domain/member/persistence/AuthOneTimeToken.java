@@ -45,6 +45,9 @@ public class AuthOneTimeToken {
     @Column(name = "token_hash", nullable = false, unique = true, length = 255)
     private String tokenHash;
 
+    @Column(name = "new_email", length = 254)
+    private String newEmail;
+
     @Column(name = "expires_at", nullable = false, columnDefinition = "TIMESTAMPTZ")
     private OffsetDateTime expiresAt;
 
@@ -85,5 +88,17 @@ public class AuthOneTimeToken {
         if (createdAt == null) createdAt = OffsetDateTime.now(ZoneOffset.UTC);
     }
 
-    public enum TokenType { PASSWORD_RESET, REAUTH }
+    public static AuthOneTimeToken createEmailChange(User user, String tokenHash, String newEmail,
+                                                    OffsetDateTime now) {
+        var token = new AuthOneTimeToken();
+        token.user = user;
+        token.tokenType = TokenType.EMAIL_CHANGE;
+        token.tokenHash = tokenHash;
+        token.newEmail = newEmail;
+        token.createdAt = now;
+        token.expiresAt = now.plusMinutes(15);
+        return token;
+    }
+
+    public enum TokenType { PASSWORD_RESET, REAUTH, EMAIL_CHANGE }
 }

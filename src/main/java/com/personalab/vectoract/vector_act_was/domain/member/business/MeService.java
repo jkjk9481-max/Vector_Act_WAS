@@ -14,9 +14,11 @@ import java.time.OffsetDateTime;
 @Service
 public class MeService {
     private final UserRepository users;
+    private final ProfileImageStorage storage;
 
     // Repository는 DB 접근 담당입니다. Spring이 구현한 UserRepository를 생성자로 전달받습니다.
-    public MeService(UserRepository users) {
+    public MeService(UserRepository users, ProfileImageStorage storage) {
+        this.storage = storage;
         this.users = users;
     }
 
@@ -32,7 +34,7 @@ public class MeService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         // business 계층은 HTTP 응답 DTO를 모르며 조회 결과만 반환합니다.
         // 비밀번호 해시 등 불필요한 엔티티 정보는 결과에 포함하지 않습니다.
-        return new Result(user.getId(), user.getName(), user.getEmail(), user.getCreatedAt());
+        return toResult(user, storage);
     }
 
     // 조회와 변경을 하나의 쓰기 트랜잭션으로 처리합니다.
@@ -43,8 +45,15 @@ public class MeService {
                 .filter(found -> found.getAccountStatus() == User.AccountStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         user.changeName(name);
-        return new Result(user.getId(), user.getName(), user.getEmail(), user.getCreatedAt());
+        return toResult(user, storage);
     }
 
-    public record Result(UUID userId, String name, String email, OffsetDateTime createdAt) {}
+    // 이미지가 있을 때만 5분 유효 Presigned URL을 만듭니다. A06·A07·A15·A16이 같은 규칙을 사용합니다.
+    static Result toResult(User user, ProfileImageStorage storage) {
+        String url = user.getProfileImageKey() == null ? null
+                : storage.presignGet(user.getProfileImageKey(), java.time.Duration.ofMinutes(5)).toString();
+        return new Result(user.getId(), user.getName(), user.getEmail(), user.getCreatedAt(), url);
+    }
+
+    public record Result(UUID userId, String name, String email, OffsetDateTime createdAt, String profileImageUrl) {}
 }

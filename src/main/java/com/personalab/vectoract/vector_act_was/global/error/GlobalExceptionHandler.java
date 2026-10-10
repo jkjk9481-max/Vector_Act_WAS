@@ -25,6 +25,19 @@ import java.util.List;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /** 컨테이너의 멀티파트 상한 초과는 핸들러 선택 전에 발생하므로 전역에서 413으로 변환합니다. */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    protected ResponseEntity<ErrorResponse> handleUploadTooLarge(Exception e) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(ErrorResponse.of(ErrorCode.FILE_TOO_LARGE));
+    }
+
+    /** 지원하지 않는 Content-Type은 핸들러 선택 단계에서 발생하므로 전역에서 415로 변환합니다. */
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotSupportedException.class)
+    protected ResponseEntity<ErrorResponse> handleMediaTypeNotSupported(Exception e) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(ErrorResponse.of(ErrorCode.UNSUPPORTED_MEDIA_TYPE));
+    }
+
     /** JSON 문법 오류나 본문 누락도 명세의 입력 검증 오류로 반환합니다. */
     @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
     protected ResponseEntity<ErrorResponse> handleUnreadableBody(Exception e) {

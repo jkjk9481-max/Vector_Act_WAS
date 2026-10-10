@@ -1,8 +1,8 @@
 package com.personalab.vectoract.vector_act_was.domain.member.presentation;
 
-import com.personalab.vectoract.vector_act_was.domain.member.business.PasswordResetRequestService;
+import com.personalab.vectoract.vector_act_was.domain.member.business.PasswordResetService;
 import com.personalab.vectoract.vector_act_was.domain.member.presentation.dto.*;
-import com.personalab.vectoract.vector_act_was.global.auth.*;
+import com.personalab.vectoract.vector_act_was.global.auth.LoginRateLimiter;
 import com.personalab.vectoract.vector_act_was.global.common.response.*;
 import com.personalab.vectoract.vector_act_was.global.error.ErrorCode;
 import com.personalab.vectoract.vector_act_was.global.error.exception.BusinessException;
@@ -11,38 +11,31 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.*;
-import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-public class PasswordResetRequestController {
-    private final PasswordResetRequestService service;
-    private final RefreshTokenGenerator generator;
-    private final LoginRateLimiter ipLimiter;
-    private final LoginRateLimiter emailLimiter;
+public class PasswordResetController {
+    private final PasswordResetService service;
+    private final LoginRateLimiter limiter;
 
-    public PasswordResetRequestController(PasswordResetRequestService service, RefreshTokenGenerator generator,
-            @Value("${auth.password-reset-rate-limit.ip-max-attempts:10}") int ipAttempts,
-            @Value("${auth.password-reset-rate-limit.email-max-attempts:3}") int emailAttempts,
-            @Value("${auth.password-reset-rate-limit.window-seconds:900}") long windowSeconds) {
+    public PasswordResetController(PasswordResetService service,
+            @Value("${auth.password-reset-completion-rate-limit.max-attempts:10}") int attempts,
+            @Value("${auth.password-reset-completion-rate-limit.window-seconds:60}") long windowSeconds) {
         this.service = service;
-        this.generator = generator;
-        this.ipLimiter = new LoginRateLimiter(ipAttempts, windowSeconds);
-        this.emailLimiter = new LoginRateLimiter(emailAttempts, windowSeconds);
+        this.limiter = new LoginRateLimiter(attempts, windowSeconds);
     }
 
-    @PostMapping("/api/auth/password-reset-requests")
-    public ResponseEntity<ApiResponse<PasswordResetRequestResponse>> request(
-            @Valid @RequestBody PasswordResetRequest body, HttpServletRequest request) {
-        ipLimiter.acquire(request.getRemoteAddr());
-        // 가입 여부 조회 전에 모든 이메일에 동일한 제한을 적용합니다.
-        emailLimiter.acquire(generator.hash(body.email()));
-        service.request(body.email());
-        return ResponseEntity.accepted().header(HttpHeaders.CACHE_CONTROL, "no-store")
+    @PostMapping("/api/auth/password-resets")
+    public ResponseEntity<ApiResponse<PasswordResetResponse>> reset(
+            @Valid @RequestBody PasswordResetRequestBody body, HttpServletRequest request) {
+        limiter.acquire(request.getRemoteAddr());
+        service.reset(body.resetToken(), body.newPassword(), body.newPasswordConfirm());
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .header(HttpHeaders.PRAGMA, "no-cache")
-                .body(ApiResponse.ok(new PasswordResetRequestResponse(true)));
+                .body(ApiResponse.ok(new PasswordResetResponse(true)));
     }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})
@@ -54,7 +47,7 @@ public class PasswordResetRequestController {
     @ExceptionHandler({DataAccessResourceFailureException.class, CannotCreateTransactionException.class})
     ResponseEntity<ErrorResponse> unavailable(Exception ignored) { return error(ErrorCode.DEPENDENCY_UNAVAILABLE); }
 
-    // 영속화 예외에 민감한 값이 포함될 수 있어 예외 원문을 기록하지 않습니다.
+    // DB 예외나 검증 오류에서 비밀번호·토큰 원문이 노출되지 않도록 지역 처리합니다.
     @ExceptionHandler(Exception.class)
     ResponseEntity<ErrorResponse> unexpected(Exception ignored) { return error(ErrorCode.INTERNAL_ERROR); }
 

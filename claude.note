@@ -1,0 +1,52 @@
+# Claude 작업 지침 (Vector Act WAS)
+
+이 프로젝트에서 작업할 때 반드시 지켜야 할 규칙입니다.
+
+## 1. 문서 위치와 용도
+
+| 종류 | 위치 | 용도 |
+| --- | --- | --- |
+| API 명세 | `docs/` (`PersonaLab-VectorAct-API명세서_최종.pdf`) | 엔드포인트, 요청/응답, 오류 코드의 기준 |
+| 기능명세·요구사항 | `docs/` (`PersonaLab-VectorAct_요구사항분석서_기능명세서_최종.pdf`) | 업무 규칙과 요구사항의 기준 |
+| DB 설계 | `docs/` (`VectorAct_DB설계서_최종.pdf`) | 테이블·컬럼·제약의 기준 |
+| AI 서버 설계 | `docs/` (`PersonaLab-VectorAct_AI서버설계서_v1.2.pdf`) | AI 서버 연동 기준 |
+| API별 구현 설명 | `docs/Axx-*.md` | 구현 후 남기는 API 단위 설명 |
+| DB 변경 SQL | `docs/sql/Axx_*.sql` | 운영 DB에 별도로 적용하는 DDL (앱이 자동 실행하지 않음) |
+
+- 구현 전에 위 명세 문서를 먼저 읽습니다.
+- PDF 텍스트 추출 시 `pdftotext -enc UTF-8 -layout` 를 사용해야 한글이 깨지지 않습니다.
+
+## 2. 패키지 구조와 네이밍 규칙
+
+```text
+com.personalab.vectoract.vector_act_was
+├── global/            공통 모듈 (auth, config, error, common/response)
+└── domain/<도메인>/
+    ├── presentation/  Controller, dto/ (요청·응답 record)
+    ├── business/      Service, 이벤트, 외부 연동 인터페이스
+    └── persistence/   Entity, Repository
+```
+
+- 계층 흐름은 Controller → Service → Repository 입니다. Controller가 Repository를 직접 호출하지 않습니다.
+- 기능 단위 이름 예: `EmailChangeRequestController` / `EmailChangeRequestService`, 완료 단계는 `EmailChangeCompletion*`.
+- 오류는 `ErrorCode`에 추가하고 `BusinessException`으로 던집니다. 응답은 `ApiResponse` / `ErrorResponse`를 사용합니다.
+- 토큰·비밀번호 원문은 로그, 응답, `toString()`에 노출하지 않습니다.
+- 주변 코드의 주석 밀도와 스타일(한국어 주석)을 따릅니다.
+
+## 3. 빌드·테스트 실행 명령어
+
+```powershell
+.\gradlew.bat compileJava --no-daemon     # 컴파일
+.\gradlew.bat test --no-daemon            # 전체 테스트
+.\gradlew.bat test --no-daemon --tests "*EmailChangeCompletionIntegrationTests"   # 특정 테스트
+```
+
+- 통합 테스트는 H2(PostgreSQL 모드)를 사용합니다. 운영 DB는 `ddl-auto=none`입니다.
+
+## 4. 작업 원칙
+
+- **문서끼리 안 맞으면 구현하지 말고 보고합니다.** (명세서 간 필드명·오류 코드·정책 불일치 등)
+- **요구사항 밖 기능을 추가하지 않습니다.** 명세에 없는 정책은 임의로 정하지 말고 설정값 또는 질문으로 처리합니다.
+- **대규모 리팩터링을 하지 않습니다.** 요청 범위의 파일만 수정합니다.
+- **수정 후 어떤 파일이 왜 바뀌었는지 설명합니다.**
+- **테스트를 돌리지 않았으면 돌리지 않았다고 말합니다.** 실패한 테스트는 출력과 함께 그대로 보고합니다.

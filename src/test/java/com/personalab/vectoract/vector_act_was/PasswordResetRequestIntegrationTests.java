@@ -39,7 +39,7 @@ class PasswordResetRequestIntegrationTests {
     @Autowired UserRepository users;
     @Autowired AuthOneTimeTokenRepository tokens;
     @Autowired RefreshTokenRepository refreshTokens;
-    @Autowired RefreshTokenGenerator generator;
+    @MockitoSpyBean RefreshTokenGenerator generator;
     @Autowired AccessTokenProvider accessTokens;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
     @Autowired JdbcTemplate jdbc;
@@ -242,6 +242,36 @@ class PasswordResetRequestIntegrationTests {
         })).isInstanceOf(IllegalStateException.class);
         assertThat(tokens.count()).isZero();
         verifyNoInteractions(delivery);
+    }
+
+    @Test
+    void tokenGenerationFailureDoesNotSaveOrDeliverOrChangeCredentials() throws Exception {
+        doThrow(new IllegalStateException("random source unavailable")).when(generator).generate();
+        send(address).andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error.code").value("INTERNAL_ERROR"));
+        assertThat(tokens.count()).isZero();
+        verifyNoInteractions(delivery);
+        assertThat(users.findById(user.getId()).orElseThrow().getPasswordHash())
+                .isEqualTo(user.getPasswordHash());
+    }
+
+    @Test
+    void storedResetTokenCanOnlyBeConsumedOnceBeforeExpiry() throws Exception {
+        send(address).andExpect(status().isAccepted());
+        var token = tokens.findAll().getFirst();
+        var transaction = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        transaction.executeWithoutResult(status -> {
+            assertThat(tokens.consumeIfUsable(token.getTokenHash(), user.getId(),
+                    AuthOneTimeToken.TokenType.REAUTH, token.getCreatedAt())).isZero();
+            assertThat(tokens.consumeIfUsable(token.getTokenHash(), UUID.randomUUID(),
+                    AuthOneTimeToken.TokenType.PASSWORD_RESET, token.getCreatedAt())).isZero();
+            assertThat(tokens.consumeIfUsable(token.getTokenHash(), user.getId(),
+                    AuthOneTimeToken.TokenType.PASSWORD_RESET, token.getExpiresAt())).isZero();
+            assertThat(tokens.consumeIfUsable(token.getTokenHash(), user.getId(),
+                    AuthOneTimeToken.TokenType.PASSWORD_RESET, token.getCreatedAt())).isOne();
+            assertThat(tokens.consumeIfUsable(token.getTokenHash(), user.getId(),
+                    AuthOneTimeToken.TokenType.PASSWORD_RESET, token.getCreatedAt())).isZero();
+        });
     }
 
     private ResultActions send(String email) throws Exception {

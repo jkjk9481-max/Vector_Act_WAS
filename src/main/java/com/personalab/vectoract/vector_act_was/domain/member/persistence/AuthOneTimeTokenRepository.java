@@ -21,6 +21,15 @@ public interface AuthOneTimeTokenRepository extends JpaRepository<AuthOneTimeTok
 
     Optional<AuthOneTimeToken> findByTokenHash(String tokenHash);
 
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update AuthOneTimeToken t set t.usedAt = :now
+            where t.user.id = :userId and t.tokenType = :tokenType and t.usedAt is null
+            """)
+    int invalidateByUserAndType(@Param("userId") UUID userId,
+                                @Param("tokenType") AuthOneTimeToken.TokenType tokenType,
+                                @Param("now") OffsetDateTime now);
+
     /**
      * 토큰 검사와 사용 처리를 하나의 조건부 UPDATE로 실행합니다.
      * 먼저 조회하고 나중에 사용 표시만 하면 두 요청이 동시에 '미사용'으로 판단할 수 있습니다.

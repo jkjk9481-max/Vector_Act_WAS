@@ -16,6 +16,9 @@ import org.springframework.http.HttpStatus;
 @RequiredArgsConstructor
 public enum ErrorCode {
 
+    RESET_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "유효하지 않은 비밀번호 재설정 토큰입니다."),
+    EMAIL_CHANGE_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "유효하지 않은 이메일 변경 토큰입니다."),
+
     REAUTH_REQUIRED(HttpStatus.FORBIDDEN, "유효한 재인증 토큰이 필요합니다."),
     ACCOUNT_DELETED(HttpStatus.CONFLICT, "이미 탈퇴한 계정입니다."),
     PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "새 비밀번호와 확인 값이 일치하지 않습니다."),
@@ -34,6 +37,8 @@ public enum ErrorCode {
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
     CSRF_INVALID(HttpStatus.FORBIDDEN, "CSRF 토큰이 없거나 유효하지 않습니다."),
+    FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "파일 크기가 허용 범위를 초과했습니다."),
+    UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 파일 형식입니다."),
 
     // ========== Auth (인증/인가) ==========
     AUTH_REQUIRED(HttpStatus.UNAUTHORIZED, "Access Token 인증이 필요합니다."),

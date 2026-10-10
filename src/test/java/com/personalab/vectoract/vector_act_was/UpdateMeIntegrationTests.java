@@ -60,7 +60,8 @@ class UpdateMeIntegrationTests {
                 .andExpect(jsonPath("$.data.email").value(user.getEmail()))
                 .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
         Map<String, Object> data = JsonPath.read(response, "$.data");
-        assertThat(data).containsOnlyKeys("userId", "name", "email", "createdAt");
+        assertThat(data).containsOnlyKeys("userId", "name", "email", "createdAt", "profileImageUrl");
+        assertThat(data.get("profileImageUrl")).isNull();
         assertThat(OffsetDateTime.parse((String) data.get("createdAt")).toInstant().truncatedTo(ChronoUnit.MILLIS))
                 .isEqualTo(user.getCreatedAt().toInstant().truncatedTo(ChronoUnit.MILLIS));
         var saved = users.findById(user.getId()).orElseThrow();

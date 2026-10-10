@@ -57,7 +57,7 @@ class MeIntegrationTests {
     }
 
     @Test
-    void returnsOnlyTheFourSpecifiedFieldsForTokenOwner() throws Exception {
+    void returnsOnlyTheSpecifiedFieldsForTokenOwner() throws Exception {
         var other = users.saveAndFlush(User.create("other@example.com", "other-hash", "다른배우"));
         var response = mvc.perform(get("/api/users/me").param("userId", other.getId().toString())
                         .header("Authorization", "Bearer " + tokens.issue(user.getId())))
@@ -69,7 +69,8 @@ class MeIntegrationTests {
                 .andExpect(jsonPath("$.data.email").value("actor@example.com"))
                 .andReturn().getResponse().getContentAsString();
         Map<String, Object> data = JsonPath.read(response, "$.data");
-        assertThat(data).containsOnlyKeys("userId", "name", "email", "createdAt");
+        assertThat(data).containsOnlyKeys("userId", "name", "email", "createdAt", "profileImageUrl");
+        assertThat(data.get("profileImageUrl")).isNull();
         assertThat(OffsetDateTime.parse((String) data.get("createdAt")).toInstant().truncatedTo(ChronoUnit.MILLIS))
                 .isEqualTo(user.getCreatedAt().toInstant().truncatedTo(ChronoUnit.MILLIS));
     }
