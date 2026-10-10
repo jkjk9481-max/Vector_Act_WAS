@@ -88,6 +88,19 @@ script:
     purge-delay-ms: ${SCRIPT_OCR_PURGE_DELAY_MS:3600000}
     purge-initial-delay-ms: ${SCRIPT_OCR_PURGE_INITIAL_DELAY_MS:120000}
 
+# C03 실시간 코칭 연결 티켓(JWT, RS256). 개인키는 애플리케이션 서버에만 두고 AI 서버에는 공개키만 배포합니다.
+# private-key: PKCS#8 PEM 전체(줄바꿈은 \n 문자 그대로도 허용). 비어 있으면 C03은 503으로 응답합니다.
+# key-id: JWT 헤더 kid. 비워 두면 공개키 지문(RFC 7638)을 사용합니다.
+# web-socket-url: 클라이언트가 접속할 같은 도메인의 WSS 기본 주소(예: wss://도메인). 비어 있으면 C03은 503입니다.
+coaching:
+  connection-ticket:
+    private-key: ${COACHING_WS_TICKET_PRIVATE_KEY:}
+    key-id: ${COACHING_WS_TICKET_KEY_ID:}
+    web-socket-url: ${COACHING_WS_URL:}
+    rate-limit:
+      max-attempts: ${COACHING_WS_TICKET_RATE_LIMIT_MAX_ATTEMPTS:20}
+      window-seconds: ${COACHING_WS_TICKET_RATE_LIMIT_WINDOW_SECONDS:60}
+
 # 원본 파일 저장소(AWS S3, 서울 리전, 비공개 버킷). 버킷이 비어 있으면 임시 메모리 저장소를 쓰므로 운영에서는 반드시 지정합니다.
 # AWS 키는 AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY 환경변수로 주입합니다.
 storage:
