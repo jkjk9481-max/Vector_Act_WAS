@@ -50,3 +50,83 @@ com.personalab.vectoract.vector_act_was
 - **대규모 리팩터링을 하지 않습니다.** 요청 범위의 파일만 수정합니다.
 - **수정 후 어떤 파일이 왜 바뀌었는지 설명합니다.**
 - **테스트를 돌리지 않았으면 돌리지 않았다고 말합니다.** 실패한 테스트는 출력과 함께 그대로 보고합니다.
+
+## 5. 구현 현황 (2026-10-11 기준, 전체 테스트 394건 통과)
+
+| ID | 기능 | 경로 | 구현 설명 | PR |
+| --- | --- | --- | --- | --- |
+| A01~A05, A08~A11, A13~A14 | CSRF·가입·로그인·재발급·로그아웃·비밀번호·재인증·탈퇴·비밀번호 재설정 요청·이메일 변경 | `/api/auth/*`, `/api/users/me/*` | `docs/Axx-*.md` | 병합됨 |
+| A02, A06, A07, A12 | 회원가입, 내 정보 조회·수정, 비밀번호 재설정 완료 | | **`docs/` 구현 설명 md 없음 (코드는 있음)** | 병합됨 |
+| A15, A16 | 프로필 이미지 등록·변경·삭제 | `/api/users/me/profile-image` | `A15-A16-profile-image.md` | 병합됨 |
+| S01, S02 | 이미지 OCR 접수·조회 | `/api/script-extractions` | `S01-S02-script-extractions.md` | #2 병합 |
+| (S3) | 프로필·OCR·영상 저장소 S3 연동 | | `S3-storage.md` | #2 병합 |
+| C01 | 연습 세션 준비 | `POST /api/coaching-sessions` | `C01-coaching-session-prepare.md` | #3 병합 |
+| C02 | 촬영 시작 | `.../{id}/start` | `C02-recording-start.md` | #4 |
+| (주석) | A13~C01 학습용 상세 주석 | | 로직 변경 없음 | #5 |
+| C03 | 연결 티켓 발급(JWT RS256) | `.../{id}/connection-tickets` | `C03-connection-ticket.md` | #6 |
+| C04 | Chunk 업로드 URL 발급 | `.../{id}/chunks/{n}/upload-url` | `C04-chunk-upload-url.md` | #7 |
+| C05 | Chunk 검증 완료 | `.../{id}/chunks/{n}/complete` | `C05-chunk-verify.md` | #8 |
+| C06 | Chunk 현황 조회 | `GET .../{id}/chunks` | `C06-chunk-status.md` | #9 |
+| C07 | 촬영 종료·최종화 접수 | `.../{id}/finish` | `C07-session-finish.md` | #10 |
+| C08 | 연습 취소 | `.../{id}/cancel` | `C08-session-cancel.md` | #11 |
+| C09 | 세션 상태 조회 | `GET .../{id}/status` | `C09-session-status.md` | #12 |
+| C10 | 분석 결과 조회 | `GET .../{id}/result` | `C10-analysis-result.md` | #13 |
+| C11 | 실패한 분석 재접수 | `.../{id}/analysis-retries` | `C11-analysis-retry.md` | #14 |
+
+- **병합 순서**: #4 → #5 → … → #14 순서로 병합해야 합니다. 쌓인 브랜치라 각 PR의 base가 바로 앞 브랜치입니다(하나 병합할 때마다 다음 PR의 base를 `main`으로 변경).
+- 브랜치: `feature/C02-recording-start` ← `docs/comments-A13-C01` ← `feature/C03-connection-ticket` ← … ← `feature/C11-analysis-retry`
+
+## 6. 공통 설계 패턴 (새 API도 같은 방식)
+
+- **오류 응답**: 컨트롤러마다 지역 `@ExceptionHandler`(검증→400, `BusinessException`→코드 상태, DB 장애→503, 그 외→500)를 두어 토큰·본문 원문이 응답에 새지 않게 합니다. 타인 소유·삭제·없는 자원은 모두 같은 404입니다.
+- **회원 행 잠금**: 변경 API는 `UserRepository.lockById`로 회원 행을 먼저 잠가 같은 회원의 요청을 직렬화합니다.
+- **멱등 키**: C01·C07·C11이 `idempotency_keys`(scope: `COACHING_SESSION_CREATE`/`_FINISH`, `COACHING_ANALYSIS_RETRY`) 사용. 같은 키·같은 본문은 처음 응답 복원, 다르면 `IDEMPOTENCY_CONFLICT`. 보관 기간은 `idempotency.ttl-hours`(기본 24h). 멱등 확인을 세션 검사보다 먼저 합니다.
+- **CSRF 제외**: Bearer 전용 API는 `SignupSecurityConfig`의 `ignoringRequestMatchers`에 경로를 추가합니다(공개 API와 별개).
+- **저장소**: `VideoStorage`/`ProfileImageStorage`/`ScriptImageStorage` 인터페이스 + `STORAGE_S3_BUCKET` 설정 시 S3, 비어 있으면 메모리 구현(테스트·로컬).
+- **진행 상태 응답**: C07·C08·C09는 `SessionProgressResponse`/`SessionProgressMapper` 공유.
+- **엔티티 상태 전이**는 엔티티 메서드로 모읍니다(`CoachingSession.startRecording/finish/cancel/queueAnalysisRetry`, `Analysis.retry` 등).
+
+## 7. 미구현·보류 항목
+
+### 7-1. 아직 만들지 않은 API (API 명세서 기준)
+- **U01~U09 영상 업로드·업로드 분석**: 대용량 업로드 시작·Part URL·완료·상태·취소·분석 접수·상태·결과·분석 취소
+- **D01~D07 대시보드**: 연습 기록 목록·상세·영상 재생 URL·기록 삭제·주간/월간 분석·누적 취약점
+- 위 U 시리즈가 필요로 하는 테이블: `video_uploads`, `video_upload_parts`, `dashboard_summaries` (DB 설계서에는 있음)
+
+### 7-2. 만든 API의 후속 처리 (코드 없음)
+- **영상 조립**: C07 접수 후 청크 → 최종 영상 조립(방식 미확정, 예: ffmpeg). 지금은 `videoStatus`가 `UPLOADING`에 머뭅니다.
+- **AI 서버 연동**: `ANALYSIS_REQUEST` 발행(C07 이후·C11 재접수), `ANALYSIS_STATUS/RESULT` 수신해 `analyses`·점수·피드백 저장, `PROFILE_REQUEST`(C01 이후), 모드 전환 `MODE_CHANGED` 반영, `DATA_DELETE` 통보. 전달 경로(Redis stream 등)는 AI 서버 설계서 8장 참고.
+- **취소·만료 정리**: C08 취소 후 S3 청크·영상 삭제와 AI 서버 통보, 30일 원본 영상 만료 삭제, 미완료 청크(`session_chunks.expires_at`) 정리, 멱등 기록 만료 정리 스케줄러, 마감(`upload_deadline_at`) 후 누락이 남은 세션의 상태 전이.
+- **이메일 발송 구현체**: `PasswordResetDelivery`, `EmailChangeDelivery`(SMTP) 없음.
+- **OCR 엔진**: `OcrEngine` 구현체 없음(기본은 `OCR_ENGINE_UNAVAILABLE`로 실패).
+- **ES256 티켓 서명**: C03은 RS256만 지원.
+
+## 8. 문서 불일치·확인이 필요한 결정
+
+1. **DB 설계서 누락(C07)**: `lastChunkIndex`·신고 길이 저장 컬럼이 없어 `declared_last_chunk_index`, `declared_duration_ms` 추가 SQL을 만들었습니다 → DB 설계서 반영 필요.
+2. **멱등 키 불일치(C02)**: DB 설계서 표는 C02가 `idempotency_keys`를 쓴다고 하나 API 명세서 C02에는 멱등 키가 없음 → 명세서를 따름.
+3. **C10 명세서 표 깨짐**: PDF 열이 어긋나 필드 조건을 문맥으로 복원 → 원문 대조 필요.
+4. **`analyses.upload_id` FK**: `video_uploads`가 아직 없어 FK 없이 컬럼만 둠(`C10_analysis_tables.sql` 주석 참고).
+5. **명세에 없어 정한 값**(바꿀 수 있음): `videoStatus`는 촬영 시작 시 `UPLOADING`, C03은 `RECORDING`에서만 발급, C04·C05는 `FINALIZING`에서 마감 전까지 허용, 청크 충돌에 구간 불일치 포함, 미예약 청크 complete는 404, `CANCELED` 분석 결과 조회는 `RESULT_NOT_READY`, "총 3회"는 최초 포함(attempt 3이면 불가), 오류 검사 순서, C03 발급 제한 20회/60초, 취소 사유 미저장.
+6. **S3 실검증 안 됨**: presigned PUT `requiredHeaders`(host·content-length 제외), HEAD 체크섬 동작은 메모리 저장소 테스트만 했습니다.
+
+## 9. 운영 배포 전 체크리스트
+
+- **SQL 적용(순서대로)**: `docs/sql/` 의 `C01_coaching_sessions` → `C02_session_videos` → `C04_session_chunks` → `C07_finish_manifest` → `C10_analysis_tables` (기존 A·S 시리즈 SQL은 이미 적용된 것으로 가정, 미적용이면 먼저)
+- **환경변수**: `STORAGE_S3_BUCKET`(+`STORAGE_S3_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`), `COACHING_WS_TICKET_PRIVATE_KEY`(RSA PKCS#8 PEM, 공개키는 AI 서버에 배포), `COACHING_WS_URL`, 선택: `COACHING_WS_TICKET_KEY_ID`, `COACHING_WS_TICKET_RATE_LIMIT_*`, `IDEMPOTENCY_TTL_HOURS` 계열 설정
+- S3 IAM 권한: `profile-images/`, `script-ocr/`, `session-chunks/` prefix에 Put/Get/Delete
+
+## 10. 다음에 할 일 (제안 순서)
+
+1. 쌓인 PR #4~#14 병합(앞에서부터)과 문서 불일치 항목(8장) 확인
+2. A02·A06·A07·A12 구현 설명 md 보강
+3. **U01~U09** 영상 업로드·업로드 분석 (`video_uploads`, `video_upload_parts` 필요 → C10의 `analyses.upload_id` FK도 함께)
+4. **D01~D07** 대시보드 (D03 영상 재생 URL은 `session_videos`·S3 presigned GET 활용)
+5. AI 서버 연동과 영상 조립(7-2) — 전달 경로·조립 방식 결정 선행
+
+## 11. 작업 방식 메모
+
+- 지시 방식: API 하나를 만들면 **테스트 → 문서(`docs/Cxx-*.md`, 필요 시 `docs/sql`) → 커밋 → 푸시 → PR**까지 하고 다음 API로 넘어갑니다. 병합은 사용자가 지시할 때만 합니다. 마지막 지시 범위는 C11까지였습니다.
+- 주석: 학습 목적이라 한국어로 흐름·이유를 상세히 답니다(로직만이 아니라 "왜"까지).
+- 환경: PowerShell/Git Bash, **Python 없음**, 큰 heredoc은 셸 파싱 오류가 나므로 파일은 Write 도구로 만듭니다. `gh` CLI는 `C:\Program Files\GitHub CLI\gh.exe`(로그인 완료).
+- 커밋 메시지 끝에 `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`, PR 본문 끝에 Claude Code 안내 문구를 붙입니다.
