@@ -125,6 +125,17 @@ public class Analysis {
         this.updatedAt = now;
     }
 
+    /**
+     * C11: 실패한 분석을 다시 대기(QUEUED) 상태로 돌립니다. 시도 번호를 1 올리고 이전 실패 코드를 지웁니다.
+     * 시도 횟수 상한(3회)과 "실패 상태일 때만" 같은 조건은 호출하는 Service가 확인합니다.
+     */
+    public void retry(OffsetDateTime now) {
+        this.status = Status.QUEUED;
+        this.attempt = this.attempt + 1;
+        this.failureCode = null;
+        this.updatedAt = now;
+    }
+
     /** 분석 실패를 기록합니다. */
     public void fail(String failureCode, OffsetDateTime now) {
         this.status = Status.FAILED;

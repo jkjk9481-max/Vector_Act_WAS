@@ -62,6 +62,8 @@ public class SignupSecurityConfig {
                                 // C04도 Bearer 전용 JSON API입니다.
                                 paths.matcher(HttpMethod.POST,
                                         "/api/coaching-sessions/{sessionId}/chunks/{chunkIndex}/upload-url"),
+                                // C11도 Bearer와 Idempotency-Key로 요청하는 본문 없는 POST입니다.
+                                paths.matcher(HttpMethod.POST, "/api/coaching-sessions/{sessionId}/analysis-retries"),
                                 // C08도 Bearer 전용 JSON API입니다.
                                 paths.matcher(HttpMethod.POST, "/api/coaching-sessions/{sessionId}/cancel"),
                                 // C07도 Bearer와 Idempotency-Key로 요청하는 JSON API입니다.
