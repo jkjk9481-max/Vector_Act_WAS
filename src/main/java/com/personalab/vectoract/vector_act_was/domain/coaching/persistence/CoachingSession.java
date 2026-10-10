@@ -29,25 +29,30 @@ public class CoachingSession {
     public enum AnalysisMode { REALTIME, NEAR_REALTIME, POST_ONLY }
     public enum Intensity { MINIMAL, NORMAL, INTENSIVE }
 
+    // API의 sessionId입니다. 애플리케이션이 UUID를 생성하므로 추측할 수 없어 URL에 노출해도 안전합니다.
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    // 세션 소유 회원. 모든 조회는 이 값을 함께 조건으로 걸어 타인의 세션이 보이지 않게 합니다.
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
+    // 세션 생성 시점의 대본 스냅샷입니다. 이후 원본이 바뀌어도 이 세션의 분석 기준은 유지됩니다.
     @Column(name = "script_content", nullable = false, columnDefinition = "TEXT")
     private String scriptContent;
 
     @Column(name = "situation", nullable = false, columnDefinition = "TEXT")
     private String situation;
 
+    // ----- 코칭 설정(C01에서 저장하고 이후 변경하지 않음) -----
     @Column(name = "visual_enabled", nullable = false)
     private boolean visualEnabled;
 
     @Column(name = "voice_enabled", nullable = false)
     private boolean voiceEnabled;
 
+    // true이면 시각·음성 코칭은 모두 false여야 합니다(DB CHECK와 Service 검사).
     @Column(name = "analysis_only", nullable = false)
     private boolean analysisOnly;
 
@@ -55,18 +60,24 @@ public class CoachingSession {
     @Column(name = "coaching_intensity", nullable = false, length = 20)
     private Intensity coachingIntensity;
 
+    // ----- 상태 -----
+    // 세션 자체의 진행 상태입니다. 활성 상태(CREATED/RECORDING/FINALIZING)는 회원당 1개만 허용됩니다.
+    // EnumType.STRING: DB에 순서 번호가 아니라 이름으로 저장해 enum 순서 변경에 안전합니다.
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private Status status;
 
+    // 원본 영상의 업로드·조립·보관 상태입니다(세션 상태와 별개로 진행됩니다).
     @Enumerated(EnumType.STRING)
     @Column(name = "video_status", nullable = false, length = 20)
     private VideoStatus videoStatus;
 
+    // AI 분석의 진행 상태입니다.
     @Enumerated(EnumType.STRING)
     @Column(name = "analysis_status", nullable = false, length = 20)
     private AnalysisStatus analysisStatus;
 
+    // 분석 처리 방식. 기본은 REALTIME이며 서버 부하에 따라 AI 서버가 NEAR_REALTIME 등으로 전환을 통보합니다.
     @Enumerated(EnumType.STRING)
     @Column(name = "analysis_mode", nullable = false, length = 20)
     private AnalysisMode analysisMode;

@@ -16,9 +16,14 @@ import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * A14 이메일 변경 완료의 HTTP 계층입니다. 메일 링크로 받은 토큰을 제출하면 이메일이 확정됩니다.
+ * 업무 규칙은 {@link EmailChangeCompletionService}에 있고, 여기서는 요청 제한과 응답 포장만 합니다.
+ */
 @RestController
 public class EmailChangeCompletionController {
     private final EmailChangeCompletionService service;
+    // 비로그인 공개 API라 회원 ID가 없습니다. 토큰 무작위 대입을 막기 위해 IP 기준으로 횟수를 제한합니다.
     private final LoginRateLimiter limiter;
 
     public EmailChangeCompletionController(EmailChangeCompletionService service,
@@ -29,22 +34,30 @@ public class EmailChangeCompletionController {
     }
 
     // 인증 링크는 비로그인 브라우저에서도 열 수 있으므로 Bearer 없이 CSRF만 요구합니다.
+    // (그래서 SignupSecurityConfig의 publicRequests에는 있고, CSRF 제외 목록에는 없습니다.)
     @PostMapping("/api/users/me/email-changes")
     public ResponseEntity<ApiResponse<EmailChangeCompletionResponse>> complete(
             @Valid @RequestBody EmailChangeCompletionRequest body, HttpServletRequest request) {
+        // 제한을 초과하면 RATE_LIMITED(429) 예외가 발생해 아래 처리로 가지 않습니다.
         limiter.acquire(request.getRemoteAddr());
         service.complete(body.changeToken());
+        // 토큰이 오가는 응답이므로 브라우저·중간 캐시가 저장하지 않게 합니다.
         return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .header(HttpHeaders.PRAGMA, "no-cache")
                 .body(ApiResponse.ok(new EmailChangeCompletionResponse(true)));
     }
 
+    // ===== 지역 예외 처리 (토큰 계열 컨트롤러의 공통 패턴) =====
+
+    /** 본문 검증 실패와 JSON 파싱 실패는 400입니다. */
     @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})
     ResponseEntity<ErrorResponse> invalidInput(Exception ignored) { return error(ErrorCode.VALIDATION_ERROR); }
 
+    /** Service가 던진 업무 오류는 ErrorCode의 HTTP 상태로 응답합니다. */
     @ExceptionHandler(BusinessException.class)
     ResponseEntity<ErrorResponse> businessError(BusinessException exception) { return error(exception.getErrorCode()); }
 
+    /** DB에 연결할 수 없는 일시적 장애는 503입니다. */
     @ExceptionHandler({DataAccessResourceFailureException.class, CannotCreateTransactionException.class})
     ResponseEntity<ErrorResponse> unavailable(Exception ignored) { return error(ErrorCode.DEPENDENCY_UNAVAILABLE); }
 
