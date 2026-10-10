@@ -2,9 +2,11 @@ package com.personalab.vectoract.vector_act_was.domain.coaching.presentation;
 
 import com.personalab.vectoract.vector_act_was.domain.coaching.business.CoachingSessionService;
 import com.personalab.vectoract.vector_act_was.domain.coaching.business.SessionFinishService;
+import com.personalab.vectoract.vector_act_was.domain.coaching.business.SessionLifecycleService;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.CoachingSessionCreateRequest;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.CoachingSessionResponse;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.CoachingSessionStartRequest;
+import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.SessionCancelRequest;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.SessionFinishRequest;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.SessionProgressResponse;
 import com.personalab.vectoract.vector_act_was.global.common.response.*;
@@ -33,10 +35,13 @@ import java.util.UUID;
 public class CoachingSessionController {
     private final CoachingSessionService service;
     private final SessionFinishService finishes;
+    private final SessionLifecycleService lifecycle;
 
-    public CoachingSessionController(CoachingSessionService service, SessionFinishService finishes) {
+    public CoachingSessionController(CoachingSessionService service, SessionFinishService finishes,
+                                     SessionLifecycleService lifecycle) {
         this.service = service;
         this.finishes = finishes;
+        this.lifecycle = lifecycle;
     }
 
     /**
@@ -78,6 +83,17 @@ public class CoachingSessionController {
         var response = finishes.finish(userId, sessionId, parseKey(idempotencyKey), body);
         return ResponseEntity.accepted().header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(ApiResponse.ok(response));
+    }
+
+    /**
+     * C08 연습 취소. 성공 시 202 Accepted. 멱등 키 없이 반복 호출할 수 있습니다(이미 취소된 세션은 같은 결과).
+     * 취소 사유(reason)는 형식만 검증하며 현재는 저장하지 않습니다.
+     */
+    @PostMapping("/api/coaching-sessions/{sessionId}/cancel")
+    public ResponseEntity<ApiResponse<SessionProgressResponse>> cancel(@AuthenticationPrincipal UUID userId,
+            @PathVariable UUID sessionId, @Valid @RequestBody SessionCancelRequest body) {
+        return ResponseEntity.accepted().header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(ApiResponse.ok(lifecycle.cancel(userId, sessionId)));
     }
 
     /** 헤더가 없거나 UUID 형식이 아니면 입력 오류입니다. 명세에 별도 오류 코드가 없어 VALIDATION_ERROR를 씁니다. */
