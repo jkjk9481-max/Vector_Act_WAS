@@ -3,6 +3,7 @@ package com.personalab.vectoract.vector_act_was.domain.coaching.presentation;
 import com.personalab.vectoract.vector_act_was.domain.coaching.business.CoachingSessionService;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.CoachingSessionCreateRequest;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.CoachingSessionResponse;
+import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.CoachingSessionStartRequest;
 import com.personalab.vectoract.vector_act_was.global.common.response.*;
 import com.personalab.vectoract.vector_act_was.global.error.ErrorCode;
 import com.personalab.vectoract.vector_act_was.global.error.exception.BusinessException;
@@ -14,8 +15,17 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import java.util.UUID;
 
+/**
+ * 연습(코칭) 세션 API(C01 준비, C02 촬영 시작)의 HTTP 계층입니다.
+ * Controller는 요청 파싱과 응답 포장만 하고, 업무 규칙은 {@link CoachingSessionService}에 맡깁니다.
+ * 이 컨트롤러는 Repository를 직접 호출하지 않습니다(Controller → Service → Repository).
+ *
+ * <p>인증: 두 API 모두 Bearer Access Token만 사용합니다. {@code @AuthenticationPrincipal UUID}는
+ * AccessTokenAuthenticationFilter가 토큰을 검증한 뒤 SecurityContext에 넣어 둔 회원 ID입니다.
+ */
 @RestController
 public class CoachingSessionController {
     private final CoachingSessionService service;
@@ -24,16 +34,34 @@ public class CoachingSessionController {
         this.service = service;
     }
 
+    /**
+     * C01 연습 세션 준비. 성공 시 201 Created.
+     * Idempotency-Key 헤더는 형식 오류를 400으로 직접 처리하려고 문자열로 받습니다
+     * (UUID 타입으로 바로 받으면 변환 실패가 다른 예외로 섞여 구분하기 어렵습니다).
+     */
     @PostMapping("/api/coaching-sessions")
     public ResponseEntity<ApiResponse<CoachingSessionResponse>> create(@AuthenticationPrincipal UUID userId,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody CoachingSessionCreateRequest body) {
         var response = service.create(userId, parseKey(idempotencyKey), body);
+        // 세션 내용(대본 등)이 담긴 응답이므로 중간 캐시에 저장되지 않게 no-store를 지정합니다.
         return ResponseEntity.status(HttpStatus.CREATED).header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(ApiResponse.created(response));
     }
 
-    // 헤더가 없거나 UUID 형식이 아니면 입력 오류입니다.
+    /**
+     * C02 촬영 시작. 성공 시 200 OK (새 자원이 아니라 기존 세션의 상태 변경이므로 201이 아닙니다).
+     * {@code @PathVariable UUID}가 UUID 형식이 아니면 MethodArgumentTypeMismatchException이 발생하며
+     * 아래 invalidInput 핸들러가 400 VALIDATION_ERROR로 바꿉니다.
+     */
+    @PostMapping("/api/coaching-sessions/{sessionId}/start")
+    public ResponseEntity<ApiResponse<CoachingSessionResponse>> start(@AuthenticationPrincipal UUID userId,
+            @PathVariable UUID sessionId, @Valid @RequestBody CoachingSessionStartRequest body) {
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(ApiResponse.ok(service.start(userId, sessionId, body)));
+    }
+
+    /** 헤더가 없거나 UUID 형식이 아니면 입력 오류입니다. 명세에 별도 오류 코드가 없어 VALIDATION_ERROR를 씁니다. */
     private static UUID parseKey(String value) {
         if (value == null) throw new BusinessException(ErrorCode.VALIDATION_ERROR);
         try {
@@ -43,16 +71,24 @@ public class CoachingSessionController {
         }
     }
 
-    @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class})
+    // ===== 지역 예외 처리 =====
+    // 이 컨트롤러가 전역 처리기 대신 자체 핸들러를 두는 이유: 요청에 담긴 대본·상황 같은 원문이
+    // 프레임워크 기본 오류 출력(예외 메시지)으로 응답에 새어 나가지 않게 하기 위해서입니다(프로젝트 공통 패턴).
+
+    /** 본문 검증 실패, JSON 파싱 실패(잘못된 enum 값 포함), 경로 변수 형식 오류는 모두 400입니다. */
+    @ExceptionHandler({MethodArgumentNotValidException.class, HttpMessageNotReadableException.class,
+            MethodArgumentTypeMismatchException.class})
     ResponseEntity<ErrorResponse> invalidInput(Exception ignored) { return error(ErrorCode.VALIDATION_ERROR); }
 
+    /** Service가 던진 업무 오류는 ErrorCode가 가진 HTTP 상태 그대로 응답합니다. */
     @ExceptionHandler(BusinessException.class)
     ResponseEntity<ErrorResponse> businessError(BusinessException exception) { return error(exception.getErrorCode()); }
 
+    /** DB 연결 불가·트랜잭션 시작 실패는 일시적 장애이므로 503입니다. */
     @ExceptionHandler({DataAccessResourceFailureException.class, CannotCreateTransactionException.class})
     ResponseEntity<ErrorResponse> unavailable(Exception ignored) { return error(ErrorCode.DEPENDENCY_UNAVAILABLE); }
 
-    // 대본·상황 원문이 예외 메시지로 응답에 노출되지 않도록 원문을 돌려주지 않습니다.
+    /** 그 밖의 예외는 원인을 응답에 담지 않고 일반 500으로만 알립니다. */
     @ExceptionHandler(Exception.class)
     ResponseEntity<ErrorResponse> unexpected(Exception ignored) { return error(ErrorCode.INTERNAL_ERROR); }
 

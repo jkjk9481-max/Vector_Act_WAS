@@ -55,6 +55,8 @@ public class SignupSecurityConfig {
                                 paths.matcher(HttpMethod.POST, "/api/script-extractions"),
                                 // C01은 Bearer와 Idempotency-Key로 요청하는 JSON API입니다.
                                 paths.matcher(HttpMethod.POST, "/api/coaching-sessions"),
+                                // C02도 Bearer 전용 JSON API입니다.
+                                paths.matcher(HttpMethod.POST, "/api/coaching-sessions/{sessionId}/start"),
                                 // /api/auth 아래에 있지만 공개 API가 아닙니다. publicRequests에는 추가하지 않습니다.
                                 paths.matcher(HttpMethod.POST, "/api/auth/reauth")))
                 // CSRF 실패는 Controller 전에 발생하므로 공통 예외 처리기가 아닌 필터에서 JSON을 만듭니다.

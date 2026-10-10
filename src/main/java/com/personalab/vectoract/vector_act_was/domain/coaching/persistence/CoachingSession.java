@@ -104,6 +104,24 @@ public class CoachingSession {
     @Column(name = "updated_at", nullable = false, columnDefinition = "TIMESTAMPTZ")
     private OffsetDateTime updatedAt;
 
+    /**
+     * C02: 촬영 시작을 접수합니다. 상태 전이 규칙을 엔티티 한곳에 모아 둔 메서드입니다.
+     * <ul>
+     *   <li>status: CREATED → RECORDING (활성 세션 상태이므로 회원당 1개 규칙은 그대로 유지됩니다)</li>
+     *   <li>videoStatus: NOT_STARTED → UPLOADING (촬영 중 Chunk가 올라오는 단계. 명세에 값이 없어 정한 값)</li>
+     *   <li>startedAt: 서버가 start를 접수한 시각(클라이언트 시각을 신뢰하지 않습니다)</li>
+     *   <li>videoExpiresAt: 시작 시각 + 30일. 이 시각 이후 원본 영상이 삭제 대상입니다(DB 설계서 삭제 정책)</li>
+     * </ul>
+     * 호출 전에 상태가 CREATED인지 확인하는 책임은 Service에 있습니다.
+     */
+    public void startRecording(OffsetDateTime now) {
+        this.status = Status.RECORDING;
+        this.videoStatus = VideoStatus.UPLOADING;
+        this.startedAt = now;
+        this.videoExpiresAt = now.plusDays(30);
+        this.updatedAt = now;
+    }
+
     /** C01: CREATED 상태의 세션을 만듭니다. 촬영 관련 값은 모두 시작 전 상태입니다. */
     public static CoachingSession prepare(UUID userId, String scriptContent, String situation,
                                           boolean visualEnabled, boolean voiceEnabled, boolean analysisOnly,
