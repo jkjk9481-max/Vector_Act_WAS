@@ -76,3 +76,14 @@ auth:
   login-rate-limit:
     max-attempts: ${LOGIN_RATE_LIMIT_MAX_ATTEMPTS:10}
     window-seconds: ${LOGIN_RATE_LIMIT_WINDOW_SECONDS:60}
+
+# S01·S02 이미지 OCR. 엔진이 연결되지 않으면 작업은 OCR_ENGINE_UNAVAILABLE로 실패합니다.
+script:
+  ocr:
+    async: ${SCRIPT_OCR_ASYNC:true}
+    rate-limit:
+      max-attempts: ${SCRIPT_OCR_RATE_LIMIT_MAX_ATTEMPTS:10}
+      window-seconds: ${SCRIPT_OCR_RATE_LIMIT_WINDOW_SECONDS:60}
+    purge-enabled: ${SCRIPT_OCR_PURGE_ENABLED:true}
+    purge-delay-ms: ${SCRIPT_OCR_PURGE_DELAY_MS:3600000}
+    purge-initial-delay-ms: ${SCRIPT_OCR_PURGE_INITIAL_DELAY_MS:120000}

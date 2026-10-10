@@ -51,6 +51,8 @@ public class SignupSecurityConfig {
                                 paths.matcher(HttpMethod.POST, "/api/users/me/email-change-requests"),
                                 paths.matcher(HttpMethod.PUT, "/api/users/me/profile-image"),
                                 paths.matcher(HttpMethod.DELETE, "/api/users/me/profile-image"),
+                                // S01은 Bearer 전용 multipart 업로드입니다. S02(GET)는 CSRF 검사 대상이 아닙니다.
+                                paths.matcher(HttpMethod.POST, "/api/script-extractions"),
                                 // /api/auth 아래에 있지만 공개 API가 아닙니다. publicRequests에는 추가하지 않습니다.
                                 paths.matcher(HttpMethod.POST, "/api/auth/reauth")))
                 // CSRF 실패는 Controller 전에 발생하므로 공통 예외 처리기가 아닌 필터에서 JSON을 만듭니다.
