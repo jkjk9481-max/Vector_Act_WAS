@@ -1,7 +1,9 @@
 package com.personalab.vectoract.vector_act_was.domain.coaching.presentation;
 
 import com.personalab.vectoract.vector_act_was.domain.coaching.business.ChunkUploadService;
+import com.personalab.vectoract.vector_act_was.domain.coaching.business.ChunkStatusService;
 import com.personalab.vectoract.vector_act_was.domain.coaching.business.ChunkVerifyService;
+import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.ChunkStatusResponse;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.ChunkUploadUrlRequest;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.ChunkUploadUrlResponse;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.ChunkVerifyResponse;
@@ -20,17 +22,20 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import java.util.UUID;
 
 /**
- * 실시간 촬영 청크 업로드 API(C04 URL 발급, 이후 C05 검증·C06 현황)의 HTTP 계층입니다.
+ * 실시간 촬영 청크 업로드 API(C04 URL 발급, C05 검증, C06 현황 조회)의 HTTP 계층입니다.
  * Bearer 인증만 사용하며, 서명된 업로드 URL이 응답에 담기므로 캐시를 막고 예외 원문은 응답에 싣지 않습니다.
  */
 @RestController
 public class SessionChunkController {
     private final ChunkUploadService uploads;
     private final ChunkVerifyService verifications;
+    private final ChunkStatusService statuses;
 
-    public SessionChunkController(ChunkUploadService uploads, ChunkVerifyService verifications) {
+    public SessionChunkController(ChunkUploadService uploads, ChunkVerifyService verifications,
+                                  ChunkStatusService statuses) {
         this.uploads = uploads;
         this.verifications = verifications;
+        this.statuses = statuses;
     }
 
     /**
@@ -57,6 +62,17 @@ public class SessionChunkController {
         var result = verifications.complete(userId, sessionId, chunkIndex);
         return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(ApiResponse.ok(new ChunkVerifyResponse(result.chunkIndex(), "VERIFIED", result.duplicate())));
+    }
+
+    /**
+     * C06: 세션의 청크 현황을 조회합니다. 읽기 전용이라 CSRF 대상이 아닌 GET입니다.
+     * 경로의 sessionId가 UUID 형식이 아니면 아래 핸들러가 400으로 바꿉니다.
+     */
+    @GetMapping("/api/coaching-sessions/{sessionId}/chunks")
+    public ResponseEntity<ApiResponse<ChunkStatusResponse>> status(@AuthenticationPrincipal UUID userId,
+            @PathVariable UUID sessionId) {
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(ApiResponse.ok(statuses.get(userId, sessionId)));
     }
 
     // ===== 지역 예외 처리 =====
