@@ -3,6 +3,7 @@ package com.personalab.vectoract.vector_act_was.domain.script.business;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,8 +23,9 @@ public class ScriptOcrConfig {
         return new UnavailableOcrEngine();
     }
 
+    // S3 버킷이 설정되면 S3ScriptImageStorage가 사용되고, 아니면 임시 메모리 구현을 씁니다.
     @Bean
-    @ConditionalOnMissingBean(ScriptImageStorage.class)
+    @ConditionalOnExpression("'${storage.s3.bucket:}'.isEmpty()")
     InMemoryScriptImageStorage inMemoryScriptImageStorage() {
         log.warn("script_image_storage type=IN_MEMORY (not for production)");
         return new InMemoryScriptImageStorage();

@@ -87,3 +87,10 @@ script:
     purge-enabled: ${SCRIPT_OCR_PURGE_ENABLED:true}
     purge-delay-ms: ${SCRIPT_OCR_PURGE_DELAY_MS:3600000}
     purge-initial-delay-ms: ${SCRIPT_OCR_PURGE_INITIAL_DELAY_MS:120000}
+
+# 원본 파일 저장소(AWS S3, 서울 리전, 비공개 버킷). 버킷이 비어 있으면 임시 메모리 저장소를 쓰므로 운영에서는 반드시 지정합니다.
+# AWS 키는 AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY 환경변수로 주입합니다.
+storage:
+  s3:
+    bucket: ${STORAGE_S3_BUCKET:}
+    region: ${STORAGE_S3_REGION:ap-northeast-2}
