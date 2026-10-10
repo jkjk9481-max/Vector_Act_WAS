@@ -68,6 +68,8 @@ public enum ErrorCode {
     CHUNK_NOT_UPLOADED(HttpStatus.CONFLICT, "청크 파일이 아직 업로드되지 않았습니다."),
     CHECKSUM_MISMATCH(HttpStatus.CONFLICT, "업로드된 청크의 크기 또는 해시가 선언과 다릅니다."),
     FINISH_MANIFEST_CONFLICT(HttpStatus.CONFLICT, "이미 접수된 종료 정보와 다른 내용입니다."),
+    RESULT_NOT_READY(HttpStatus.CONFLICT, "분석 결과가 아직 준비되지 않았습니다."),
+    ANALYSIS_FAILED(HttpStatus.CONFLICT, "분석에 실패했습니다."),
     UPLOAD_EXPIRED(HttpStatus.GONE, "업로드 가능 시간이 지났습니다."),
     SESSION_STATE_CONFLICT(HttpStatus.CONFLICT, "현재 세션 상태에서는 요청을 처리할 수 없습니다."),
     ACTIVE_SESSION_EXISTS(HttpStatus.CONFLICT, "이미 진행 중인 연습 세션이 있습니다."),
