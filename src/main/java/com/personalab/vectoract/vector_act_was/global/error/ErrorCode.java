@@ -64,6 +64,8 @@ public enum ErrorCode {
     COACHING_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "존재하지 않는 코칭 세션입니다."),
     COACHING_SESSION_ALREADY_ENDED(HttpStatus.BAD_REQUEST, "이미 종료된 코칭 세션입니다."),
     COACHING_CONFIG_CONFLICT(HttpStatus.BAD_REQUEST, "코칭 설정이 서로 충돌합니다."),
+    CHUNK_CONFLICT(HttpStatus.CONFLICT, "같은 번호의 청크가 다른 내용으로 이미 등록되어 있습니다."),
+    UPLOAD_EXPIRED(HttpStatus.GONE, "업로드 가능 시간이 지났습니다."),
     SESSION_STATE_CONFLICT(HttpStatus.CONFLICT, "현재 세션 상태에서는 요청을 처리할 수 없습니다."),
     ACTIVE_SESSION_EXISTS(HttpStatus.CONFLICT, "이미 진행 중인 연습 세션이 있습니다."),
     IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, "같은 멱등 키로 다른 내용의 요청이 이미 처리되었습니다.");
