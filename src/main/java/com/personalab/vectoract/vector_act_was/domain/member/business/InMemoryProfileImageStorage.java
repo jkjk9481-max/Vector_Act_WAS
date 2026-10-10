@@ -3,6 +3,7 @@ package com.personalab.vectoract.vector_act_was.domain.member.business;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 import java.net.URI;
 import java.time.Duration;
@@ -12,10 +13,11 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 실제 S3 연결 전까지 사용하는 임시 저장소입니다. 서버를 재시작하면 이미지가 사라지고,
- * 반환하는 URL도 실제로 내려받을 수 없습니다. 운영 배포 전에 S3 구현체로 교체해야 합니다.
+ * storage.s3.bucket이 설정되지 않았을 때만 사용하는 임시 저장소입니다. 서버를 재시작하면 이미지가 사라지고,
+ * 반환하는 URL도 실제로 내려받을 수 없습니다. 운영에서는 STORAGE_S3_BUCKET을 지정해 S3 구현체를 사용해야 합니다.
  */
 @Component
+@ConditionalOnExpression("'${storage.s3.bucket:}'.isEmpty()")
 public class InMemoryProfileImageStorage implements ProfileImageStorage {
     private static final Logger log = LoggerFactory.getLogger(InMemoryProfileImageStorage.class);
     private final Map<String, byte[]> objects = new ConcurrentHashMap<>();
