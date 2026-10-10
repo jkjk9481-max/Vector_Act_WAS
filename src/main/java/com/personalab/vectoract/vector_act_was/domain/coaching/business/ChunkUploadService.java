@@ -103,7 +103,7 @@ public class ChunkUploadService {
      *   <li>그 밖의 상태(시작 전, 완료, 실패, 취소): 409 SESSION_STATE_CONFLICT입니다.</li>
      * </ul>
      */
-    private static void requireUploadable(CoachingSession session, OffsetDateTime now) {
+    static void requireUploadable(CoachingSession session, OffsetDateTime now) {
         switch (session.getStatus()) {
             case RECORDING -> { }
             case FINALIZING -> {
