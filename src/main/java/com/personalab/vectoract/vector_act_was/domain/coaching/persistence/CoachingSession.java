@@ -159,6 +159,19 @@ public class CoachingSession {
         this.updatedAt = now;
     }
 
+    /**
+     * C08: 세션을 취소합니다. 상태를 CANCELED로 바꿔 활성 세션 자리를 비웁니다.
+     * 분석이 진행 중이었다면(QUEUED/PROCESSING) 분석 상태도 CANCELED로 표시하고, 그 밖의 분석·영상 상태는
+     * 그대로 둡니다. 취소 사유는 저장할 컬럼이 없어 보관하지 않습니다.
+     */
+    public void cancel(OffsetDateTime now) {
+        this.status = Status.CANCELED;
+        if (analysisStatus == AnalysisStatus.QUEUED || analysisStatus == AnalysisStatus.PROCESSING) {
+            this.analysisStatus = AnalysisStatus.CANCELED;
+        }
+        this.updatedAt = now;
+    }
+
     /** 이미 접수된 종료 선언과 같은 내용인지 확인합니다. */
     public boolean sameFinishManifest(int lastChunkIndex, int durationMs) {
         return declaredLastChunkIndex != null && declaredLastChunkIndex == lastChunkIndex
