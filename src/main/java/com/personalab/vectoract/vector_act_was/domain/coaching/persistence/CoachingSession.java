@@ -97,6 +97,15 @@ public class CoachingSession {
     @Column(name = "upload_deadline_at", columnDefinition = "TIMESTAMPTZ")
     private OffsetDateTime uploadDeadlineAt;
 
+    // ----- 촬영 종료(C07) 선언 값 -----
+    // 클라이언트가 종료 때 신고한 마지막 청크 번호와 길이입니다. 미디어 검증 전의 신고값이라 duration_ms(검증된 길이)와
+    // 별도로 저장하며, 최초 종료 선언 이후에는 바꿀 수 없습니다. (DB 설계서에 없는 컬럼 — docs/sql/C07 참고)
+    @Column(name = "declared_last_chunk_index")
+    private Integer declaredLastChunkIndex;
+
+    @Column(name = "declared_duration_ms")
+    private Integer declaredDurationMs;
+
     @Column(name = "analysis_attempt", nullable = false)
     private int analysisAttempt;
 
@@ -131,6 +140,29 @@ public class CoachingSession {
         this.startedAt = now;
         this.videoExpiresAt = now.plusDays(30);
         this.updatedAt = now;
+    }
+
+    /**
+     * C07: 촬영 종료를 최초로 접수합니다. RECORDING → FINALIZING.
+     * <ul>
+     *   <li>endedAt: 서버가 finish를 접수한 시각</li>
+     *   <li>uploadDeadlineAt: 최초 접수 + 15분. 누락 청크는 이 시각까지만 올릴 수 있습니다(C04·C05가 확인)</li>
+     *   <li>declared*: 최초 종료 선언 값. 이후 변경할 수 없습니다</li>
+     * </ul>
+     */
+    public void finish(int lastChunkIndex, int durationMs, OffsetDateTime now) {
+        this.status = Status.FINALIZING;
+        this.endedAt = now;
+        this.uploadDeadlineAt = now.plusMinutes(15);
+        this.declaredLastChunkIndex = lastChunkIndex;
+        this.declaredDurationMs = durationMs;
+        this.updatedAt = now;
+    }
+
+    /** 이미 접수된 종료 선언과 같은 내용인지 확인합니다. */
+    public boolean sameFinishManifest(int lastChunkIndex, int durationMs) {
+        return declaredLastChunkIndex != null && declaredLastChunkIndex == lastChunkIndex
+                && declaredDurationMs != null && declaredDurationMs == durationMs;
     }
 
     /** C01: CREATED 상태의 세션을 만듭니다. 촬영 관련 값은 모두 시작 전 상태입니다. */

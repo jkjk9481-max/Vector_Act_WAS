@@ -1,9 +1,12 @@
 package com.personalab.vectoract.vector_act_was.domain.coaching.presentation;
 
 import com.personalab.vectoract.vector_act_was.domain.coaching.business.CoachingSessionService;
+import com.personalab.vectoract.vector_act_was.domain.coaching.business.SessionFinishService;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.CoachingSessionCreateRequest;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.CoachingSessionResponse;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.CoachingSessionStartRequest;
+import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.SessionFinishRequest;
+import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.SessionProgressResponse;
 import com.personalab.vectoract.vector_act_was.global.common.response.*;
 import com.personalab.vectoract.vector_act_was.global.error.ErrorCode;
 import com.personalab.vectoract.vector_act_was.global.error.exception.BusinessException;
@@ -29,9 +32,11 @@ import java.util.UUID;
 @RestController
 public class CoachingSessionController {
     private final CoachingSessionService service;
+    private final SessionFinishService finishes;
 
-    public CoachingSessionController(CoachingSessionService service) {
+    public CoachingSessionController(CoachingSessionService service, SessionFinishService finishes) {
         this.service = service;
+        this.finishes = finishes;
     }
 
     /**
@@ -59,6 +64,20 @@ public class CoachingSessionController {
             @PathVariable UUID sessionId, @Valid @RequestBody CoachingSessionStartRequest body) {
         return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(ApiResponse.ok(service.start(userId, sessionId, body)));
+    }
+
+    /**
+     * C07 촬영 종료·최종화 접수. 성공 시 202 Accepted(후속 조립·분석은 비동기로 진행됩니다).
+     * C01과 같이 Idempotency-Key 헤더가 필요하고, 같은 키·같은 본문의 재시도에는 처음 응답을 돌려줍니다.
+     */
+    @PostMapping("/api/coaching-sessions/{sessionId}/finish")
+    public ResponseEntity<ApiResponse<SessionProgressResponse>> finish(@AuthenticationPrincipal UUID userId,
+            @PathVariable UUID sessionId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody SessionFinishRequest body) {
+        var response = finishes.finish(userId, sessionId, parseKey(idempotencyKey), body);
+        return ResponseEntity.accepted().header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(ApiResponse.ok(response));
     }
 
     /** 헤더가 없거나 UUID 형식이 아니면 입력 오류입니다. 명세에 별도 오류 코드가 없어 VALIDATION_ERROR를 씁니다. */
