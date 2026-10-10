@@ -96,6 +96,16 @@ public class CoachingSessionController {
                 .body(ApiResponse.ok(lifecycle.cancel(userId, sessionId)));
     }
 
+    /**
+     * C09 세션 상태 조회. 성공 시 200 OK. 읽기 전용 GET이라 CSRF 대상이 아닙니다.
+     */
+    @GetMapping("/api/coaching-sessions/{sessionId}/status")
+    public ResponseEntity<ApiResponse<SessionProgressResponse>> status(@AuthenticationPrincipal UUID userId,
+            @PathVariable UUID sessionId) {
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(ApiResponse.ok(lifecycle.get(userId, sessionId)));
+    }
+
     /** 헤더가 없거나 UUID 형식이 아니면 입력 오류입니다. 명세에 별도 오류 코드가 없어 VALIDATION_ERROR를 씁니다. */
     private static UUID parseKey(String value) {
         if (value == null) throw new BusinessException(ErrorCode.VALIDATION_ERROR);

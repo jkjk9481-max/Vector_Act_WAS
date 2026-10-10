@@ -51,4 +51,16 @@ public class SessionLifecycleService {
         }
         return progress.toResponse(session);
     }
+
+    /**
+     * C09 세션 상태 조회. 읽기 전용이며 세션이 어떤 상태든 소유자는 조회할 수 있습니다.
+     * 촬영 중 세션의 영상·분석 상태는 실시간 코칭 연결이 아니라 이 API로 확인합니다.
+     * 타인 소유·삭제된·없는 세션은 구분되지 않는 같은 404입니다.
+     */
+    @Transactional(readOnly = true)
+    public SessionProgressResponse get(UUID userId, UUID sessionId) {
+        var session = sessions.findByIdAndUserIdAndDeletedAtIsNull(sessionId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        return progress.toResponse(session);
+    }
 }
