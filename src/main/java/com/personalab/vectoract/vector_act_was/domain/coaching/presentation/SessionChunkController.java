@@ -1,8 +1,10 @@
 package com.personalab.vectoract.vector_act_was.domain.coaching.presentation;
 
 import com.personalab.vectoract.vector_act_was.domain.coaching.business.ChunkUploadService;
+import com.personalab.vectoract.vector_act_was.domain.coaching.business.ChunkVerifyService;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.ChunkUploadUrlRequest;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.ChunkUploadUrlResponse;
+import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.ChunkVerifyResponse;
 import com.personalab.vectoract.vector_act_was.global.common.response.*;
 import com.personalab.vectoract.vector_act_was.global.error.ErrorCode;
 import com.personalab.vectoract.vector_act_was.global.error.exception.BusinessException;
@@ -24,9 +26,11 @@ import java.util.UUID;
 @RestController
 public class SessionChunkController {
     private final ChunkUploadService uploads;
+    private final ChunkVerifyService verifications;
 
-    public SessionChunkController(ChunkUploadService uploads) {
+    public SessionChunkController(ChunkUploadService uploads, ChunkVerifyService verifications) {
         this.uploads = uploads;
+        this.verifications = verifications;
     }
 
     /**
@@ -41,6 +45,18 @@ public class SessionChunkController {
         // 서명된 URL은 그 자체가 업로드 권한이라 브라우저·중간 캐시에 남지 않게 합니다.
         return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .header(HttpHeaders.PRAGMA, "no-cache").body(ApiResponse.ok(response));
+    }
+
+    /**
+     * C05: 업로드한 청크의 크기·해시를 검증해 확정합니다. 본문 없이 호출하며 성공 시 200 OK.
+     * 이미 검증된 청크를 다시 호출해도 200이고 {@code duplicate=true}로 구분됩니다.
+     */
+    @PostMapping("/api/coaching-sessions/{sessionId}/chunks/{chunkIndex}/complete")
+    public ResponseEntity<ApiResponse<ChunkVerifyResponse>> complete(@AuthenticationPrincipal UUID userId,
+            @PathVariable UUID sessionId, @PathVariable int chunkIndex) {
+        var result = verifications.complete(userId, sessionId, chunkIndex);
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(ApiResponse.ok(new ChunkVerifyResponse(result.chunkIndex(), "VERIFIED", result.duplicate())));
     }
 
     // ===== 지역 예외 처리 =====

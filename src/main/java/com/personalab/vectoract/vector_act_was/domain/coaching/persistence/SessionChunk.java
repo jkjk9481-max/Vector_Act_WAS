@@ -85,6 +85,12 @@ public class SessionChunk {
         return chunk;
     }
 
+    /** C05: 실제 업로드 객체의 크기·해시가 선언과 같음을 확인했을 때 VERIFIED로 바꿉니다. */
+    public void markVerified(OffsetDateTime now) {
+        this.status = Status.VERIFIED;
+        this.verifiedAt = now;
+    }
+
     /** 같은 내용으로 업로드 URL을 다시 발급할 때 정리 기준 시각을 연장합니다. */
     public void extendReservation(OffsetDateTime expiresAt) {
         this.expiresAt = expiresAt;

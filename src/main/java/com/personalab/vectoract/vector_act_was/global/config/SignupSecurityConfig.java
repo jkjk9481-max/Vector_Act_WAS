@@ -62,6 +62,9 @@ public class SignupSecurityConfig {
                                 // C04도 Bearer 전용 JSON API입니다.
                                 paths.matcher(HttpMethod.POST,
                                         "/api/coaching-sessions/{sessionId}/chunks/{chunkIndex}/upload-url"),
+                                // C05도 Bearer 전용이며 본문이 없는 POST입니다.
+                                paths.matcher(HttpMethod.POST,
+                                        "/api/coaching-sessions/{sessionId}/chunks/{chunkIndex}/complete"),
                                 // /api/auth 아래에 있지만 공개 API가 아닙니다. publicRequests에는 추가하지 않습니다.
                                 paths.matcher(HttpMethod.POST, "/api/auth/reauth")))
                 // CSRF 실패는 Controller 전에 발생하므로 공통 예외 처리기가 아닌 필터에서 JSON을 만듭니다.
