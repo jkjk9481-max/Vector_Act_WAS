@@ -15,6 +15,8 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -59,7 +61,7 @@ public class AnalysisResultService {
     }
 
     /**
-     * 오류: 타인·삭제된·없는 세션은 404, 결과가 아직 없거나 진행 중이거나 취소됐으면 409 RESULT_NOT_READY,
+     * C10: 오류: 타인·삭제된·없는 세션은 404, 결과가 아직 없거나 진행 중이거나 취소됐으면 409 RESULT_NOT_READY,
      * 분석이 실패했으면 409 ANALYSIS_FAILED.
      */
     @Transactional(readOnly = true)
@@ -68,19 +70,36 @@ public class AnalysisResultService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         var analysis = analyses.findBySessionId(sessionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESULT_NOT_READY));
+        return toResponse(analysis);
+    }
+
+    /**
+     * U08: 업로드 영상 분석 결과 조회. 경로의 analysisId가 본인 소유의 UPLOADED_VIDEO 분석이어야 합니다(타인·없는·
+     * LIVE_CAPTURE 분석은 같은 404). 결과가 24시간 보관 기한을 지났으면 410 RESULT_EXPIRED입니다.
+     */
+    @Transactional(readOnly = true)
+    public AnalysisResultResponse getForUpload(UUID userId, UUID analysisId) {
+        var analysis = analyses.findByIdAndUserId(analysisId, userId)
+                .filter(a -> Analysis.SOURCE_UPLOADED_VIDEO.equals(a.getSource()))
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        if (analysis.getExpiresAt() != null && !analysis.getExpiresAt().isAfter(OffsetDateTime.now(ZoneOffset.UTC))) {
+            throw new BusinessException(ErrorCode.RESULT_EXPIRED);
+        }
+        return toResponse(analysis);
+    }
+
+    private AnalysisResultResponse toResponse(Analysis analysis) {
         switch (analysis.getStatus()) {
             case COMPLETED, PARTIAL -> { }
             case FAILED -> throw new BusinessException(ErrorCode.ANALYSIS_FAILED);
             default -> throw new BusinessException(ErrorCode.RESULT_NOT_READY);
         }
-
-        var response = new AnalysisResultResponse(analysis.getId(), analysis.getSessionId(), analysis.getSource(),
+        return new AnalysisResultResponse(analysis.getId(), analysis.getSessionId(), analysis.getSource(),
                 analysis.getStatus().name(), analysis.getSchemaVersion(), analysis.getModelVersion(),
                 analysis.getScoringVersion(), analysis.getDurationMs(), oneDecimal(analysis.getOverallScore()),
                 scoreItems(analysis), analysis.getSummary(), strings(analysis.getStrengths()),
                 strings(analysis.getImprovements()), segments(analysis), strings(analysis.getNextPractice()),
                 analysis.getGeneratedAt());
-        return response;
     }
 
     /**

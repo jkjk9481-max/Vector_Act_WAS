@@ -19,11 +19,14 @@ import java.util.UUID;
  * 이 엔티티는 실시간(LIVE_CAPTURE) 조회에 필요한 컬럼만 매핑합니다(업로드 분석의 upload_id 등은 제외).
  */
 @Entity
-@Table(name = "analyses", uniqueConstraints = @UniqueConstraint(name = "uq_analyses_session", columnNames = "session_id"))
+@Table(name = "analyses", uniqueConstraints = {
+        @UniqueConstraint(name = "uq_analyses_session", columnNames = "session_id"),
+        @UniqueConstraint(name = "uq_analyses_upload", columnNames = "upload_id")})
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Analysis {
     public static final String SOURCE_LIVE_CAPTURE = "LIVE_CAPTURE";
+    public static final String SOURCE_UPLOADED_VIDEO = "UPLOADED_VIDEO";
 
     public enum Status { QUEUED, PROCESSING, COMPLETED, PARTIAL, FAILED, CANCELED }
 
@@ -41,6 +44,11 @@ public class Analysis {
     // 실시간 분석이면 소속 세션 ID입니다. 세션당 분석은 최대 1개(UNIQUE)입니다.
     @Column(name = "session_id")
     private UUID sessionId;
+
+    // 업로드 영상 분석(U06~)이면 소속 업로드 ID입니다. 업로드당 분석은 최대 1개(UNIQUE)입니다.
+    // source/session_id/upload_id의 조합 CHECK는 운영 DB에 있고(docs/sql/C10_analysis_tables.sql), 앱은 Service에서 지킵니다.
+    @Column(name = "upload_id")
+    private UUID uploadId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -87,6 +95,10 @@ public class Analysis {
     @Column(name = "generated_at", columnDefinition = "TIMESTAMPTZ")
     private OffsetDateTime generatedAt;
 
+    // 업로드 분석 결과의 24시간 만료 시각(종료 상태 진입 시 설정). 실시간(LIVE_CAPTURE)은 항상 null입니다.
+    @Column(name = "expires_at", columnDefinition = "TIMESTAMPTZ")
+    private OffsetDateTime expiresAt;
+
     @Column(name = "created_at", nullable = false, columnDefinition = "TIMESTAMPTZ")
     private OffsetDateTime createdAt;
 
@@ -123,6 +135,7 @@ public class Analysis {
         this.failureCode = null;
         this.generatedAt = now;
         this.updatedAt = now;
+        if (uploadId != null) this.expiresAt = now.plusHours(24);
     }
 
     /**
@@ -136,10 +149,34 @@ public class Analysis {
         this.updatedAt = now;
     }
 
-    /** 분석 실패를 기록합니다. */
+    /** 분석 실패를 기록합니다. 업로드 분석이면(uploadId가 있으면) 종료 상태 진입이므로 24시간 만료 시각도 함께 둡니다. */
     public void fail(String failureCode, OffsetDateTime now) {
         this.status = Status.FAILED;
         this.failureCode = failureCode;
         this.updatedAt = now;
+        if (uploadId != null) this.expiresAt = now.plusHours(24);
+    }
+
+    /** U06: 업로드 영상 분석을 접수한 상태(QUEUED, 시도 1)로 만듭니다. */
+    public static Analysis queuedForUpload(UUID userId, UUID uploadId, OffsetDateTime now) {
+        var analysis = new Analysis();
+        analysis.userId = userId;
+        analysis.source = SOURCE_UPLOADED_VIDEO;
+        analysis.uploadId = uploadId;
+        analysis.status = Status.QUEUED;
+        analysis.attempt = 1;
+        analysis.createdAt = now;
+        analysis.updatedAt = now;
+        return analysis;
+    }
+
+    /**
+     * U09: 업로드 분석을 취소합니다. QUEUED/PROCESSING일 때만 호출 책임이 있으며(Service가 확인),
+     * 종료 상태 진입이므로 24시간 만료 시각을 함께 둡니다.
+     */
+    public void cancel(OffsetDateTime now) {
+        this.status = Status.CANCELED;
+        this.updatedAt = now;
+        this.expiresAt = now.plusHours(24);
     }
 }
