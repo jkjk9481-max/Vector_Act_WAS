@@ -13,6 +13,7 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 import java.io.IOException;
 import java.net.URI;
@@ -92,6 +93,15 @@ public class S3VideoStorage implements VideoStorage {
     @Override
     public void delete(String key) {
         s3.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());
+    }
+
+    @Override
+    public URI presignGet(String key, Duration ttl) {
+        var request = GetObjectPresignRequest.builder()
+                .signatureDuration(ttl)
+                .getObjectRequest(GetObjectRequest.builder().bucket(bucket).key(key).build())
+                .build();
+        return URI.create(presigner.presignGetObject(request).url().toString());
     }
 
     // 체크섬이 저장되어 있지 않은 객체를 위한 대체 경로입니다. 스트림으로 읽어 메모리를 적게 씁니다.

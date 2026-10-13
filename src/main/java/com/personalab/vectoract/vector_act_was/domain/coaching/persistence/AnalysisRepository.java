@@ -1,12 +1,17 @@
 package com.personalab.vectoract.vector_act_was.domain.coaching.persistence;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface AnalysisRepository extends JpaRepository<Analysis, UUID> {
     /** 실시간 세션의 분석을 조회합니다. 세션당 최대 1건(UNIQUE)입니다. */
     Optional<Analysis> findBySessionId(UUID sessionId);
+
+    /** D01: 목록 한 페이지에 속한 세션들의 분석을 한 번에 조회합니다(overallScore만 쓰려고 N+1을 피함). */
+    List<Analysis> findBySessionIdIn(Collection<UUID> sessionIds);
 
     /** 업로드 영상 분석을 조회합니다. 업로드당 최대 1건(UNIQUE)입니다. U05가 "분석 접수 전만 취소 가능"을 확인할 때도 씁니다. */
     Optional<Analysis> findByUploadId(UUID uploadId);

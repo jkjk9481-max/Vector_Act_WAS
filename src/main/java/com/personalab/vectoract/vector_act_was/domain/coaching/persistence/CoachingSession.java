@@ -173,6 +173,18 @@ public class CoachingSession {
     }
 
     /**
+     * D04: 기록 삭제를 접수합니다. deletedAt을 즉시 찍어 조회·집계에서 바로 제외시키고,
+     * deletionStatus는 PENDING으로 둡니다(파일·자식 데이터 정리와 AI 서버 삭제 통보가 끝나야 비동기로
+     * DONE이 됩니다 — DB 설계서 6장 보존·삭제 정책. 그 비동기 정리 단계는 이 PR의 범위 밖입니다).
+     * 호출 전에 상태가 삭제 가능한 상태(COMPLETED/FAILED/CANCELED)인지 확인하는 책임은 Service에 있습니다.
+     */
+    public void requestDeletion(OffsetDateTime now) {
+        this.deletionStatus = "PENDING";
+        this.deletedAt = now;
+        this.updatedAt = now;
+    }
+
+    /**
      * C11: 재분석이 접수됐을 때 세션의 분석 상태를 대기(QUEUED)로 돌리고 시도 횟수를 맞춥니다.
      * 세션 상태(status)와 영상 상태는 그대로 둡니다.
      */

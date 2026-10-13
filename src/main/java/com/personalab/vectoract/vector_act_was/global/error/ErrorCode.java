@@ -73,6 +73,7 @@ public enum ErrorCode {
     ANALYSIS_ALREADY_RUNNING(HttpStatus.CONFLICT, "분석이 이미 진행 중입니다."),
     RETRY_NOT_ALLOWED(HttpStatus.CONFLICT, "재분석을 요청할 수 없는 상태입니다."),
     VIDEO_EXPIRED(HttpStatus.GONE, "원본 영상이 만료되어 재분석할 수 없습니다."),
+    VIDEO_NOT_READY(HttpStatus.CONFLICT, "영상이 아직 재생할 수 있는 상태가 아닙니다."),
     UPLOAD_EXPIRED(HttpStatus.GONE, "업로드 가능 시간이 지났습니다."),
     SESSION_STATE_CONFLICT(HttpStatus.CONFLICT, "현재 세션 상태에서는 요청을 처리할 수 없습니다."),
     ACTIVE_SESSION_EXISTS(HttpStatus.CONFLICT, "이미 진행 중인 연습 세션이 있습니다."),
