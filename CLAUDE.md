@@ -20,14 +20,28 @@ Windows / PowerShell, Java 21, Spring Boot 4.1 (Gradle wrapper). No lint task is
 
 ## Source of truth and workflow
 
-- Requirements live in `docs/*.pdf` (API 명세서, 기능명세서/요구사항분석서, DB 설계서, AI 서버 설계서). Work is organized by API ID (`A01`–`A16`...). Each implemented API gets `docs/Axx-*.md` and, if the schema changed, `docs/sql/Axx_*.sql`.
+- Requirements live in `docs/*.pdf` (API 명세서, 기능명세서/요구사항분석서, DB 설계서, AI 서버 설계서). Work is organized by API ID (`A01`–`A16`, `C01`–`C11`, `D01`–`D07`, `S01`–`S02`, `U01`–`U09`...). Each implemented API gets `docs/Axx-*.md` and, if the schema changed, `docs/sql/Axx_*.sql`.
+- Read the relevant spec doc(s) before implementing an API.
 - Extract PDF text with `pdftotext -enc UTF-8 -layout <file> <out.txt>`; without `-enc UTF-8` Korean text comes out garbled.
-- `claude.note` holds the working rules: report (don't implement) when documents conflict, no features beyond the spec, no large refactors, explain which files changed and why, and say plainly if tests were not run.
 - `README.md` is the original architecture guide, but its response-format section is outdated (see below). Trust the code.
+
+## Working principles
+
+- **Report, don't implement, when documents conflict** (field names, error codes, or policy mismatches between the API spec, the functional spec, and the DB design doc).
+- **Don't add functionality beyond the spec.** When a policy isn't specified, turn it into a config value or ask, rather than guessing silently — if a judgment call has to be made, write it down in the API's `docs/Axx-*.md` under a clearly marked "assumed / needs confirmation" note instead of picking silently.
+- **No large refactors.** Touch only the files the current task needs.
+- **After changes, say which files changed and why.**
+- **Say plainly when tests weren't run.** Report failing test output as-is, don't paraphrase it away.
 
 ## Architecture
 
-Package root `com.personalab.vectoract.vector_act_was`: `global/` (shared infra) and `domain/<name>/{presentation,business,persistence}`. Only `member` exists so far. Flow is Controller → Service → Repository; Controllers never touch Repositories.
+Package root `com.personalab.vectoract.vector_act_was`: `global/` (shared infra) and `domain/<name>/{presentation,business,persistence}`. Domains so far: `member`, `coaching`, `dashboard`, `script`, `upload`. Flow is Controller → Service → Repository; Controllers never touch Repositories.
+
+**Naming.** Match the feature name across layers, e.g. `EmailChangeRequestController`/`EmailChangeRequestService`; a distinct follow-up stage gets its own prefix (`EmailChangeCompletion*`).
+
+**Secrets in code.** Never let raw tokens or passwords leak into logs, responses, or `toString()`.
+
+**Comments.** Match the surrounding code's comment density and style — this codebase comments in Korean.
 
 **Response envelope.** Actual shape is `{"success":true,"data":...,"message":"OK","error":null}` (see `ApiResponse`/`ErrorResponse`), not the `status/timestamp` shape shown in README. Errors are `BusinessException(ErrorCode.X)`; `ErrorCode` carries the HTTP status.
 
