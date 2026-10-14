@@ -35,3 +35,8 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### AI assistant working notes (개인/도구별 작업 노트, 팀 공유 대상 아님) ###
+claude.note
+codex.note
+individual.note
