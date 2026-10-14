@@ -40,3 +40,8 @@ out/
 claude.note
 codex.note
 individual.note
+
+### 명세·설계 원본 문서 (저장소 바깥에서 관리, git 추적 대상 아님) ###
+docs/*.pdf
+docs/*.xlsx
+docs/*.zip
