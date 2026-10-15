@@ -176,6 +176,17 @@ public class CoachingSessionService {
     }
 
     /**
+     * D02 연습 기록 상세. 읽기 전용이며 세션이 어떤 상태든 소유자는 조회할 수 있습니다.
+     * 타인 소유·삭제된·없는 세션은 구분되지 않는 같은 404입니다.
+     */
+    @Transactional(readOnly = true)
+    public CoachingSessionResponse get(UUID userId, UUID sessionId) {
+        var session = sessions.findByIdAndUserIdAndDeletedAtIsNull(sessionId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        return CoachingSessionResponse.of(session);
+    }
+
+    /**
      * 요청의 mimeType을 지원 목록의 정식 표기로 바꿉니다. 지원하지 않으면 415입니다.
      * 브라우저가 대소문자나 공백을 다르게 보낼 수 있어, 공백을 모두 지우고 소문자로 맞춘 값으로 비교합니다.
      * (예: " video/MP4; codecs=avc1.42E01E,mp4a.40.2" → "video/mp4;codecs=avc1.42e01e,mp4a.40.2")

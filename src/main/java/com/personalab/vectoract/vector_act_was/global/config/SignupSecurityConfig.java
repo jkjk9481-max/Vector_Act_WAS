@@ -71,8 +71,22 @@ public class SignupSecurityConfig {
                                 // C05도 Bearer 전용이며 본문이 없는 POST입니다.
                                 paths.matcher(HttpMethod.POST,
                                         "/api/coaching-sessions/{sessionId}/chunks/{chunkIndex}/complete"),
+                                // D04도 Bearer 전용이며 본문이 없는 DELETE입니다.
+                                paths.matcher(HttpMethod.DELETE, "/api/coaching-sessions/{sessionId}"),
                                 // /api/auth 아래에 있지만 공개 API가 아닙니다. publicRequests에는 추가하지 않습니다.
-                                paths.matcher(HttpMethod.POST, "/api/auth/reauth")))
+                                paths.matcher(HttpMethod.POST, "/api/auth/reauth"),
+                                // U01도 Bearer와 Idempotency-Key로 요청하는 JSON API입니다.
+                                paths.matcher(HttpMethod.POST, "/api/video-uploads"),
+                                // U02도 Bearer 전용 JSON API입니다.
+                                paths.matcher(HttpMethod.POST, "/api/video-uploads/{uploadId}/parts/{partNumber}/upload-url"),
+                                // U03도 Bearer 전용 JSON API입니다.
+                                paths.matcher(HttpMethod.POST, "/api/video-uploads/{uploadId}/complete"),
+                                // U05도 Bearer 전용이며 본문이 없는 DELETE입니다.
+                                paths.matcher(HttpMethod.DELETE, "/api/video-uploads/{uploadId}"),
+                                // U06도 Bearer와 Idempotency-Key로 요청하는 JSON API입니다.
+                                paths.matcher(HttpMethod.POST, "/api/upload-analyses"),
+                                // U09도 Bearer 전용이며 본문이 없는 POST입니다.
+                                paths.matcher(HttpMethod.POST, "/api/upload-analyses/{analysisId}/cancel")))
                 // CSRF 실패는 Controller 전에 발생하므로 공통 예외 처리기가 아닌 필터에서 JSON을 만듭니다.
                 .exceptionHandling(errors -> errors.accessDeniedHandler((request, response, exception) -> {
                     response.setStatus(403);

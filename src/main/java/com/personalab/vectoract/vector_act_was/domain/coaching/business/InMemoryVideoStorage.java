@@ -65,6 +65,12 @@ public class InMemoryVideoStorage implements VideoStorage {
         objects.remove(key);
     }
 
+    @Override
+    public URI presignGet(String key, Duration ttl) {
+        // 실제 서명은 하지 않습니다. 만료 시각만 흉내 낸 가짜 URL이며 .invalid 도메인이라 접속할 수 없습니다.
+        return URI.create("https://storage.invalid/" + key + "?expires=" + Instant.now().plus(ttl).getEpochSecond());
+    }
+
     // ----- 테스트용: 클라이언트가 업로드를 마친 상태를 흉내 냅니다 -----
     public void store(String key, byte[] content) { objects.put(key, content.clone()); }
 

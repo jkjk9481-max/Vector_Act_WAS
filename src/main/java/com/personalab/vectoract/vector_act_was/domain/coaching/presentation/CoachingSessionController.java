@@ -1,19 +1,25 @@
 package com.personalab.vectoract.vector_act_was.domain.coaching.presentation;
 
+import com.personalab.vectoract.vector_act_was.domain.coaching.business.CoachingSessionListService;
 import com.personalab.vectoract.vector_act_was.domain.coaching.business.CoachingSessionService;
 import com.personalab.vectoract.vector_act_was.domain.coaching.business.SessionFinishService;
 import com.personalab.vectoract.vector_act_was.domain.coaching.business.SessionLifecycleService;
+import com.personalab.vectoract.vector_act_was.domain.coaching.business.SessionVideoAccessService;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.CoachingSessionCreateRequest;
+import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.CoachingSessionListResponse;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.CoachingSessionResponse;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.CoachingSessionStartRequest;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.SessionCancelRequest;
+import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.SessionDeletionResponse;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.SessionFinishRequest;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.SessionProgressResponse;
+import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.SessionVideoUrlResponse;
 import com.personalab.vectoract.vector_act_was.global.common.response.*;
 import com.personalab.vectoract.vector_act_was.global.error.ErrorCode;
 import com.personalab.vectoract.vector_act_was.global.error.exception.BusinessException;
 import jakarta.validation.Valid;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,6 +27,7 @@ import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -36,12 +43,31 @@ public class CoachingSessionController {
     private final CoachingSessionService service;
     private final SessionFinishService finishes;
     private final SessionLifecycleService lifecycle;
+    private final CoachingSessionListService lists;
+    private final SessionVideoAccessService videoAccess;
 
     public CoachingSessionController(CoachingSessionService service, SessionFinishService finishes,
-                                     SessionLifecycleService lifecycle) {
+                                     SessionLifecycleService lifecycle, CoachingSessionListService lists,
+                                     SessionVideoAccessService videoAccess) {
         this.service = service;
         this.finishes = finishes;
         this.lifecycle = lifecycle;
+        this.lists = lists;
+        this.videoAccess = videoAccess;
+    }
+
+    /**
+     * D01 연습 기록 목록. 성공 시 200 OK. 읽기 전용 GET이라 CSRF 대상이 아닙니다.
+     * from/to는 KST 날짜(yyyy-MM-dd)이며, 형식이 아니면 아래 invalidInput 핸들러가 400으로 바꿉니다.
+     */
+    @GetMapping("/api/coaching-sessions")
+    public ResponseEntity<ApiResponse<CoachingSessionListResponse>> list(@AuthenticationPrincipal UUID userId,
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String sort,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(ApiResponse.ok(lists.list(userId, page, size, sort, from, to)));
     }
 
     /**
@@ -104,6 +130,37 @@ public class CoachingSessionController {
             @PathVariable UUID sessionId) {
         return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(ApiResponse.ok(lifecycle.get(userId, sessionId)));
+    }
+
+    /**
+     * D02 연습 기록 상세. 성공 시 200 OK. 대본·상황이 담긴 응답이라 no-store로 캐시를 막습니다.
+     */
+    @GetMapping("/api/coaching-sessions/{sessionId}")
+    public ResponseEntity<ApiResponse<CoachingSessionResponse>> get(@AuthenticationPrincipal UUID userId,
+            @PathVariable UUID sessionId) {
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(ApiResponse.ok(service.get(userId, sessionId)));
+    }
+
+    /**
+     * D04 연습 기록 삭제. 성공 시 202 Accepted(자식 데이터 정리·AI 서버 통보는 비동기). 활성 세션은
+     * C08(취소)을 먼저 써야 하므로 SESSION_STATE_CONFLICT(409)입니다.
+     */
+    @DeleteMapping("/api/coaching-sessions/{sessionId}")
+    public ResponseEntity<ApiResponse<SessionDeletionResponse>> delete(@AuthenticationPrincipal UUID userId,
+            @PathVariable UUID sessionId) {
+        return ResponseEntity.accepted().header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(ApiResponse.ok(lifecycle.delete(userId, sessionId)));
+    }
+
+    /**
+     * D03 영상 재생 URL 발급. 성공 시 200 OK. URL 자체도 민감하므로 no-store로 캐시를 막습니다.
+     */
+    @GetMapping("/api/coaching-sessions/{sessionId}/video")
+    public ResponseEntity<ApiResponse<SessionVideoUrlResponse>> video(@AuthenticationPrincipal UUID userId,
+            @PathVariable UUID sessionId) {
+        return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(ApiResponse.ok(videoAccess.getPlaybackUrl(userId, sessionId)));
     }
 
     /** 헤더가 없거나 UUID 형식이 아니면 입력 오류입니다. 명세에 별도 오류 코드가 없어 VALIDATION_ERROR를 씁니다. */

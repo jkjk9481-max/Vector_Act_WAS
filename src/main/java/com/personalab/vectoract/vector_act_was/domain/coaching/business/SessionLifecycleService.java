@@ -2,6 +2,7 @@ package com.personalab.vectoract.vector_act_was.domain.coaching.business;
 
 import com.personalab.vectoract.vector_act_was.domain.coaching.persistence.CoachingSession;
 import com.personalab.vectoract.vector_act_was.domain.coaching.persistence.CoachingSessionRepository;
+import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.SessionDeletionResponse;
 import com.personalab.vectoract.vector_act_was.domain.coaching.presentation.dto.SessionProgressResponse;
 import com.personalab.vectoract.vector_act_was.domain.member.persistence.UserRepository;
 import com.personalab.vectoract.vector_act_was.global.error.ErrorCode;
@@ -62,5 +63,27 @@ public class SessionLifecycleService {
         var session = sessions.findByIdAndUserIdAndDeletedAtIsNull(sessionId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         return progress.toResponse(session);
+    }
+
+    /**
+     * D04 연습 기록 삭제. 활성 세션(CREATED/RECORDING/FINALIZING)은 C08(취소)을 먼저 써야 하므로
+     * 종료 상태(COMPLETED/FAILED/CANCELED)만 삭제할 수 있고, 그 외에는 409 SESSION_STATE_CONFLICT입니다.
+     *
+     * <p>deletedAt을 즉시 찍어 이후 조회·목록(D01·D02)·통계(D05~D07)에서 바로 제외시킵니다.
+     * 원본 영상·청크 같은 자식 데이터의 실제 정리와 AI 서버 삭제 통보는 비동기(이 메서드 밖)이므로
+     * deletionStatus는 PENDING으로 응답합니다.
+     */
+    @Transactional
+    public SessionDeletionResponse delete(UUID userId, UUID sessionId) {
+        users.lockById(userId).orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+        var session = sessions.findByIdAndUserIdAndDeletedAtIsNull(sessionId, userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (CoachingSession.ACTIVE_STATUSES.contains(session.getStatus())) {
+            throw new BusinessException(ErrorCode.SESSION_STATE_CONFLICT);
+        }
+
+        session.requestDeletion(OffsetDateTime.now(ZoneOffset.UTC));
+        return new SessionDeletionResponse(session.getDeletionStatus(), session.getDeletedAt());
     }
 }

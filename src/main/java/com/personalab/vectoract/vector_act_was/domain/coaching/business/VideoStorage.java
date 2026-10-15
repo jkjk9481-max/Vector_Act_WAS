@@ -34,6 +34,14 @@ public interface VideoStorage {
     void delete(String key);
 
     /**
+     * 읽기 전용 임시 URL(Presigned GET)을 만듭니다(D03). 버킷은 비공개이므로 재생하려면
+     * 서버가 서명한 이 URL이 필요합니다.
+     *
+     * @param ttl URL 유효 시간(API 명세서: 5분)
+     */
+    URI presignGet(String key, Duration ttl);
+
+    /**
      * 발급된 업로드 URL과, 업로드 요청에 <b>그대로</b> 붙여야 하는 헤더 목록입니다.
      * 서명에 포함된 헤더를 빠뜨리거나 바꾸면 저장소가 서명 불일치로 거절합니다.
      */

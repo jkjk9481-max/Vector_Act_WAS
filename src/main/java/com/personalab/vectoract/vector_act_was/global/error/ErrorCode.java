@@ -73,10 +73,19 @@ public enum ErrorCode {
     ANALYSIS_ALREADY_RUNNING(HttpStatus.CONFLICT, "분석이 이미 진행 중입니다."),
     RETRY_NOT_ALLOWED(HttpStatus.CONFLICT, "재분석을 요청할 수 없는 상태입니다."),
     VIDEO_EXPIRED(HttpStatus.GONE, "원본 영상이 만료되어 재분석할 수 없습니다."),
+    VIDEO_NOT_READY(HttpStatus.CONFLICT, "영상이 아직 재생할 수 있는 상태가 아닙니다."),
     UPLOAD_EXPIRED(HttpStatus.GONE, "업로드 가능 시간이 지났습니다."),
     SESSION_STATE_CONFLICT(HttpStatus.CONFLICT, "현재 세션 상태에서는 요청을 처리할 수 없습니다."),
     ACTIVE_SESSION_EXISTS(HttpStatus.CONFLICT, "이미 진행 중인 연습 세션이 있습니다."),
-    IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, "같은 멱등 키로 다른 내용의 요청이 이미 처리되었습니다.");
+    IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT, "같은 멱등 키로 다른 내용의 요청이 이미 처리되었습니다."),
+
+    // ========== Video Upload (대용량 업로드, U 시리즈) ==========
+    PART_CONFLICT(HttpStatus.CONFLICT, "같은 번호의 Part가 다른 내용으로 이미 등록되어 있습니다."),
+    UPLOAD_STATE_CONFLICT(HttpStatus.CONFLICT, "현재 업로드 상태에서는 요청을 처리할 수 없습니다."),
+    PARTS_MISSING(HttpStatus.CONFLICT, "일부 Part가 아직 업로드되지 않았습니다."),
+    UPLOAD_IN_USE(HttpStatus.CONFLICT, "이미 분석에 사용된 업로드입니다."),
+    UPLOAD_NOT_READY(HttpStatus.CONFLICT, "업로드 검증이 완료되지 않았습니다."),
+    ANALYSIS_STATE_CONFLICT(HttpStatus.CONFLICT, "현재 분석 상태에서는 요청을 처리할 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;
